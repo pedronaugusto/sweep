@@ -89,9 +89,11 @@ while (it.next()) |step| {
 A pattern compiles to a Thompson automaton over units, bytes or UTF-8 scalars,
 whose epsilon edges all point forwards. A set of threads is closed in one sweep in
 index order, so each automaton state is visited at most once per subject unit:
-O(n·m) for n units and m states. Every executor counts the states it visits and
-asserts that bound in safe builds; the tests run it against inputs that make
-backtracking matchers exponential.
+O(n·m) for n units and m states. The NFA counts the states it closes, and a set's
+lazy DFA its transitions and the states it closes to build new ones, and both
+assert that bound in safe builds; a literal comparison or the eager DFA takes one
+step a unit. The tests run the bound against inputs that make backtracking
+matchers exponential.
 
 Three executors sit on top of the automaton. A pattern a few byte comparisons
 decide (`src/main.zig`, `*.c` at any depth, `build/**`, `**/node_modules`) never
@@ -103,10 +105,14 @@ rest as one lazy DFA whose states a per-thread cache builds on first use.
 
 `match` builds the automaton on the stack, in about 16 KiB, and allocates
 nothing. It takes patterns up to 1024 units with up to 64 brackets; a longer one
-is `error.PatternTooLong` and compiles as a `Pattern`. `Pattern` and `Set`
+is `error.PatternTooLong` and compiles as a `Pattern`. A `Pattern` takes up to
+8192 units (`Pattern.max_units`) and runs its NFA on the caller's stack, in about
+8 KiB, so any number of threads query it with nothing shared; a longer pattern is
+`error.PatternTooLong`, and a `Set` of one entry takes it. `Pattern` and `Set`
 allocate when they are built and never after; a `Set.Cache` allocates once at
 `init`, clears itself when full, and finishes a query that keeps clearing it on the
-NFA, so its capacity changes speed, never answers or the bound.
+NFA, so its capacity changes speed, never answers or the bound. `cache.stats()`
+counts the states built, the clears and the fallbacks.
 
 ### Dialects
 
@@ -149,7 +155,7 @@ offset and the reason.
 | Call | Does |
 |---|---|
 | `match(pattern, subject, options)` | Whether a pattern matches all of a subject, with no allocation |
-| `Pattern.compile(gpa, pattern, options)` | A pattern compiled once; nothing stays borrowed |
+| `Pattern.compile(gpa, pattern, options)` | A pattern of up to 8192 units compiled once; nothing stays borrowed |
 | `pattern.matches(subject)` | Whether it matches |
 | `pattern.ancestor(subject)` | The end of the shortest prefix ending at a separator, or the whole subject, that matches |
 | `pattern.leadsTo(dir)` | Whether anything below `dir` could match; exact, so a walk can prune by it |
@@ -183,6 +189,12 @@ exclude policy are the caller's: gitignore is `if (set.last(...)) |i| !negated[i
 Every target Zig supports. sweep uses only `std.mem`, `std.hash` and an
 `Allocator`; behaviour is the same everywhere.
 
+## Built with
+
+- [Zig](https://ziglang.org) 0.17.0 and its standard library; nothing is linked.
+- [preflight](https://github.com/pedronaugusto/preflight) runs the source checks,
+  the tests and CI.
+
 ## Testing
 
 `zig build test` runs the suite and the usage example. git's own wildmatch test
@@ -191,8 +203,9 @@ patterns and subjects over git's alphabet must get the same answer from sweep in
 all four git modes. A naive backtracking matcher, written from the rules above, is
 the oracle for every other dialect and case. Compiled patterns are held to the
 one-shot matcher executor by executor, `ancestor` and `leadsTo` to brute force, and
-sets to their entries matched one by one, `ancestors` included. The step bound is
-asserted on the shapes that make backtracking exponential, at 4096 units. Every
+sets to their entries matched one by one, `ancestors` included, also with a cache
+so small that queries finish on the NFA. The step bound is asserted on the shapes
+that make backtracking exponential, at 4096 units. Every
 allocation failure in building is survived without a leak, queries are counted to
 allocate nothing, and eight threads share one set. The properties run on seeded
 inputs in every `zig build test`, and under `zig build test --fuzz` they search
