@@ -216,10 +216,11 @@ allocate nothing, and eight threads share one set. The properties run on seeded
 inputs in every `zig build test`, and under `zig build test --fuzz` they search
 further.
 
-`zig build bench -- [--smoke] [--json]` times sweep's own workloads in ReleaseFast:
-single patterns one-shot and compiled over a synthetic tree, compile times, set
-queries at 100 to 10,000 entries, and the adversarial shapes, each the best of 50
-calls. CI compiles the benchmarks and never times them.
+`zig build bench` times sweep's own workloads in ReleaseFast: single patterns one-shot
+and compiled over a synthetic tree, compile times, set queries at 100 to 10,000 entries,
+and the adversarial shapes, each the best of 50 calls. Run from `zig-out/bench`, `bench
+--json` prints JSON lines. `zig build test` runs it once at its smallest size with
+`--smoke`; CI times nothing.
 
 ## Licence
 

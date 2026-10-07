@@ -3,6 +3,7 @@
 const std = @import("std");
 const sweep = @import("../sweep.zig");
 const pattern_mod = @import("../pattern.zig");
+const NoResize = @import("shakedown").alloc.NoResize;
 
 const Set = sweep.Set;
 const Pattern = sweep.Pattern;
@@ -23,8 +24,15 @@ fn compileAll(gpa: std.mem.Allocator) !void {
     }
 }
 
+/// Every growth an allocation, so the count of failures to try is the same
+/// in every run.
+fn steady() NoResize {
+    return .init(std.testing.allocator);
+}
+
 test "Pattern.compile survives every allocation failure" {
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, compileAll, .{});
+    var backing = steady();
+    try std.testing.checkAllAllocationFailures(backing.allocator(), compileAll, .{});
 }
 
 fn buildSet(gpa: std.mem.Allocator) !void {
@@ -41,7 +49,8 @@ fn buildSet(gpa: std.mem.Allocator) !void {
 }
 
 test "Set building survives every allocation failure" {
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, buildSet, .{});
+    var backing = steady();
+    try std.testing.checkAllAllocationFailures(backing.allocator(), buildSet, .{});
 }
 
 const subjects = [_][]const u8{ "src/a/test_b.zig", "lib/x.h", "build/a/b", "été", "abde", "aCe", "x/node_modules/y", "a/b/c", "" };

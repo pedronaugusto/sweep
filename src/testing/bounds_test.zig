@@ -6,6 +6,7 @@ const sweep = @import("../sweep.zig");
 const program = @import("../program.zig");
 const parse = @import("../parse.zig");
 const nfa = @import("../nfa.zig");
+const repeat = @import("shakedown").corpus.repeat;
 
 const gpa = std.testing.allocator;
 
@@ -51,26 +52,16 @@ const Owned = struct {
     }
 };
 
-fn repeat(piece: []const u8, times: usize, tail: []const u8) ![]u8 {
-    var out: std.ArrayList(u8) = .empty;
-    errdefer out.deinit(gpa);
-    for (0..times) |_| try out.appendSlice(gpa, piece);
-    try out.appendSlice(gpa, tail);
-    return out.toOwnedSlice(gpa);
-}
-
-fn family(piece: []const u8, times: usize, tail: []const u8, subject: []const u8, options: sweep.Options, want: bool) !void {
-    const pattern = try repeat(piece, times, tail);
-    defer gpa.free(pattern);
+fn family(comptime piece: []const u8, comptime times: usize, comptime tail: []const u8, subject: []const u8, options: sweep.Options, want: bool) !void {
+    const pattern = repeat(piece, times) ++ tail;
     var owned: Owned = try .init(pattern, options);
     defer owned.deinit();
     try std.testing.expectEqual(want, try owned.run(subject));
 }
 
 test "up to 32 stars before an absent literal" {
-    const a4096 = try repeat("a", 4096, "");
-    defer gpa.free(a4096);
-    for ([_]usize{ 1, 8, 32 }) |k| {
+    const a4096 = repeat("a", 4096);
+    inline for (.{ 1, 8, 32 }) |k| {
         try family("*a", k, "b", a4096, .{}, false);
         try family("*a", k, "b", a4096, .{ .syntax = .git_text }, false);
         try family("*", k, "b", a4096, .{}, false);
@@ -78,8 +69,7 @@ test "up to 32 stars before an absent literal" {
 }
 
 test "globstar chains, adjacent or not, over deep paths" {
-    const deep = try repeat("x/", 60, "y");
-    defer gpa.free(deep);
+    const deep = repeat("x/", 60) ++ "y";
     try family("**/", 32, "z", deep, .{}, false);
     try family("**/", 32, "y", deep, .{}, true);
     try family("*/**/", 30, "z", deep, .{}, false);
@@ -88,26 +78,19 @@ test "globstar chains, adjacent or not, over deep paths" {
 }
 
 test "lookout's stall shapes" {
-    const deep = try repeat("a", 4000, "/c");
-    defer gpa.free(deep);
+    const deep = repeat("a", 4000) ++ "/c";
     try family("**a", 20, "**b", deep, .{}, false);
     try family("**a*a*a*a*a*a*/", 1, "b", deep, .{}, false);
     try family("*a", 8, "*/b", deep, .{ .syntax = .{ .globstar = .anywhere } }, false);
 }
 
 test "brace bombs are linear" {
-    const subject = try repeat("ab", 2048, "");
-    defer gpa.free(subject);
+    const subject = repeat("ab", 2048);
     try family("{a,b}", 20, "", subject[0..20], .{ .syntax = .glob }, true);
     try family("{a,b}", 20, "*", subject, .{ .syntax = .glob }, true);
     try family("{a,ab,b}", 200, "c", subject, .{ .syntax = .glob }, false);
     // Braces nested 200 deep.
-    const open = try repeat("{a,", 200, "b");
-    defer gpa.free(open);
-    const nested = try repeat("}", 200, "");
-    defer gpa.free(nested);
-    const pattern = try std.mem.concat(gpa, u8, &.{ open, nested });
-    defer gpa.free(pattern);
+    const pattern = repeat("{a,", 200) ++ "b" ++ repeat("}", 200);
     var owned: Owned = try .init(pattern, .{ .syntax = .glob });
     defer owned.deinit();
     try std.testing.expect(try owned.run("b"));
@@ -116,23 +99,16 @@ test "brace bombs are linear" {
 }
 
 test "a 4096-member bracket against a 4096-unit subject" {
-    var pattern: std.ArrayList(u8) = .empty;
-    defer pattern.deinit(gpa);
-    try pattern.append(gpa, '[');
-    for (0..4096) |i| try pattern.append(gpa, "abcdefgh"[i % 8]);
-    try pattern.appendSlice(gpa, "]*");
-    const subject = try repeat("h", 4096, "");
-    defer gpa.free(subject);
-    var owned: Owned = try .init(pattern.items, .{});
+    const pattern = "[" ++ repeat("abcdefgh", 512) ++ "]*";
+    const subject = repeat("h", 4096);
+    var owned: Owned = try .init(pattern, .{});
     defer owned.deinit();
     try std.testing.expect(try owned.run(subject));
 }
 
 test "a 4096-unit pattern against a 4096-unit subject" {
-    const pattern = try repeat("*a?", 1365, "b");
-    defer gpa.free(pattern);
-    const subject = try repeat("a", 4096, "");
-    defer gpa.free(subject);
+    const pattern = repeat("*a?", 1365) ++ "b";
+    const subject = repeat("a", 4096);
     var owned: Owned = try .init(pattern, .{});
     defer owned.deinit();
     try std.testing.expect(!try owned.run(subject));

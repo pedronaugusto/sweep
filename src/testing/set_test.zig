@@ -4,6 +4,7 @@
 const std = @import("std");
 const sweep = @import("../sweep.zig");
 const gen = @import("gen.zig");
+const repeat = @import("shakedown").corpus.repeat;
 
 // The property loops build thousands of patterns; the testing allocator's
 // bookkeeping would dominate them. Leaks and failures are allocation_test's.
@@ -246,7 +247,7 @@ test "a set whose cache keeps clearing still answers within the bound" {
     defer cache.deinit();
     var long: [4096]u8 = undefined;
     for (&long) |*c| c.* = "ab"[r.uintLessThan(usize, 2)];
-    const subjects = [_][]const u8{ "abcdabcdabcdabcdx", gen.repeat("aaaabbbbccccdddd", 4) ++ "y", gen.repeat("dcbadcbadcba", 8) ++ "z", &long };
+    const subjects = [_][]const u8{ "abcdabcdabcdabcdx", repeat("aaaabbbbccccdddd", 4) ++ "y", repeat("dcbadcbadcba", 8) ++ "z", &long };
     var out: std.ArrayList(u32) = .empty;
     defer out.deinit(gpa);
     for (subjects) |subject| {

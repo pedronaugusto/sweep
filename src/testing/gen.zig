@@ -100,14 +100,3 @@ pub fn seeded(comptime one: fn (Source) anyerror!void, seed: u64, count: usize) 
     var prng: std.Random.DefaultPrng = .init(seed);
     for (0..count) |_| try one(.{ .random = prng.random() });
 }
-
-/// `text` written `times` times, at compile time.
-pub inline fn repeat(comptime text: []const u8, comptime times: usize) *const [text.len * times]u8 {
-    comptime {
-        @setEvalBranchQuota(4 * text.len * times + 1000);
-        var out: [text.len * times]u8 = undefined;
-        for (0..times) |i| @memcpy(out[i * text.len ..][0..text.len], text);
-        const final = out;
-        return &final;
-    }
-}

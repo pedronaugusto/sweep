@@ -3,6 +3,7 @@
 const std = @import("std");
 const sweep = @import("../sweep.zig");
 const gen = @import("gen.zig");
+const repeat = @import("shakedown").corpus.repeat;
 const pattern_mod = @import("../pattern.zig");
 
 // The property loops build thousands of patterns; the testing allocator's
@@ -178,7 +179,7 @@ test "patterns past the eager DFA's cap keep their NFA" {
     try pattern.append(gpa, 'b');
     var p: Pattern = try .compile(gpa, pattern.items, .{});
     defer p.deinit();
-    const text = gen.repeat("a", 300) ++ "b";
+    const text = repeat("a", 300) ++ "b";
     try std.testing.expectEqual(try sweep.match(pattern.items, text, .{}), p.matches(text));
     try std.testing.expect(p.matches(text));
 }
@@ -189,7 +190,7 @@ test "a pattern at the longest runs its NFA on the stack, and a longer one is a 
     for (0..Pattern.max_units / 2) |_| try pattern.appendSlice(gpa, "?*");
     var p: Pattern = try .compile(gpa, pattern.items, .{});
     defer p.deinit();
-    const yes = gen.repeat("x", Pattern.max_units / 2);
+    const yes = repeat("x", Pattern.max_units / 2);
     try std.testing.expect(pattern_mod.matchesBy(&p, yes, .nfa));
     try std.testing.expect(!pattern_mod.matchesBy(&p, yes[0 .. yes.len - 1], .nfa));
     // One unit more: refused, with the reason, and a set of one entry takes it.

@@ -8,6 +8,9 @@
   "test_support": [
     "src/testing/**"
   ],
+  "test_dependencies": [
+    "shakedown"
+  ],
   "function_exceptions": {},
   "layout_exceptions": {},
   "docs": {

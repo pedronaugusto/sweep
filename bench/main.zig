@@ -53,7 +53,7 @@ pub fn main(init: std.process.Init) !void {
 
     const paths = try gen.tree(a, if (smoke) 2_000 else 100_000, 0x5eeb);
     try single(r, gpa, paths);
-    try compile(r, gpa, paths);
+    try compile(r, gpa, if (smoke) 1 else 2_000);
     for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
     try adversarial(r, gpa, a, smoke);
 }
@@ -79,16 +79,14 @@ fn single(r: Report, gpa: Allocator, paths: []const []const u8) !void {
     }
 }
 
-fn compile(r: Report, gpa: Allocator, paths: []const []const u8) !void {
-    _ = paths;
+fn compile(r: Report, gpa: Allocator, rounds: usize) !void {
     for (gen.singles) |case| {
-        const rounds = 2_000;
         const t0 = r.now();
         for (0..rounds) |_| {
             var p: sweep.Pattern = try .compile(gpa, case[0], .{ .anywhere = case[1] });
             p.deinit();
         }
-        try r.line("compile", case[0], "compile", nsBetween(t0, r.now()) / rounds, "ns");
+        try r.line("compile", case[0], "compile", nsBetween(t0, r.now()) / @as(f64, @floatFromInt(rounds)), "ns");
     }
 }
 
