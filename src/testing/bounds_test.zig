@@ -67,7 +67,7 @@ fn family(piece: []const u8, times: usize, tail: []const u8, subject: []const u8
     try std.testing.expectEqual(want, try owned.run(subject));
 }
 
-test "stars before an absent literal (Cox; minimatch CVE-2026-26996)" {
+test "up to 32 stars before an absent literal" {
     const a4096 = try repeat("a", 4096, "");
     defer gpa.free(a4096);
     for ([_]usize{ 1, 8, 32 }) |k| {
@@ -77,7 +77,7 @@ test "stars before an absent literal (Cox; minimatch CVE-2026-26996)" {
     }
 }
 
-test "globstar chains over deep paths (minimatch CVE-2026-27903, relic)" {
+test "globstar chains, adjacent or not, over deep paths" {
     const deep = try repeat("x/", 60, "y");
     defer gpa.free(deep);
     try family("**/", 32, "z", deep, .{}, false);
