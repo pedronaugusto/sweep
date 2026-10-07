@@ -52,31 +52,56 @@ pub fn main(init: std.process.Init) !void {
     defer r.w.flush() catch {};
 
     const paths = try gen.tree(a, if (smoke) 2_000 else 100_000, 0x5eeb);
-    try single(r, gpa, paths);
+    try single(r, gpa, paths, smoke);
     try compile(r, gpa, if (smoke) 1 else 2_000);
     for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
     try adversarial(r, gpa, a, smoke);
 }
 
-fn single(r: Report, gpa: Allocator, paths: []const []const u8) !void {
+fn single(r: Report, gpa: Allocator, paths: []const []const u8, smoke: bool) !void {
+    // A pass is a fraction of a millisecond: each engine's row is the best
+    // of several passes in a row, so a cold cache, a timer tick or the other
+    // engine's last pass does not decide it.
+    const passes: usize = if (smoke) 1 else 7;
     for (gen.singles) |case| {
         const options: sweep.Options = .{ .anywhere = case[1] };
-        var matched: usize = 0;
-        const t0 = r.now();
-        for (paths) |p| matched += @intFromBool(try sweep.match(case[0], p, options));
-        const t1 = r.now();
         var pattern: sweep.Pattern = try .compile(gpa, case[0], options);
         defer pattern.deinit();
+        var one_shot_ns: f64 = std.math.inf(f64);
+        var matched: usize = 0;
+        for (0..passes) |_| {
+            const t = r.now();
+            matched = try oneShotPass(case[0], options, paths);
+            one_shot_ns = @min(one_shot_ns, nsBetween(t, r.now()));
+        }
+        var compiled_ns: f64 = std.math.inf(f64);
         var compiled: usize = 0;
-        const t2 = r.now();
-        for (paths) |p| compiled += @intFromBool(pattern.matches(p));
-        const t3 = r.now();
+        for (0..passes) |_| {
+            const t = r.now();
+            compiled = compiledPass(&pattern, paths);
+            compiled_ns = @min(compiled_ns, nsBetween(t, r.now()));
+        }
         if (matched != compiled) return error.EnginesDisagree;
         const count: f64 = @floatFromInt(paths.len);
-        try r.line("single", case[0], "one-shot", nsBetween(t0, t1) / count, "ns/path");
-        try r.line("single", case[0], "compiled", nsBetween(t2, t3) / count, "ns/path");
+        try r.line("single", case[0], "one-shot", one_shot_ns / count, "ns/path");
+        try r.line("single", case[0], "compiled", compiled_ns / count, "ns/path");
         try r.line("single", case[0], "matched", @floatFromInt(matched), "paths");
     }
+}
+
+// Each timed loop has a function of its own, so how one engine's code is
+// laid out never moves the other's loop.
+
+noinline fn oneShotPass(pattern: []const u8, options: sweep.Options, paths: []const []const u8) !usize {
+    var matched: usize = 0;
+    for (paths) |p| matched += @intFromBool(try sweep.match(pattern, p, options));
+    return matched;
+}
+
+noinline fn compiledPass(pattern: *const sweep.Pattern, paths: []const []const u8) usize {
+    var matched: usize = 0;
+    for (paths) |p| matched += @intFromBool(pattern.matches(p));
+    return matched;
 }
 
 fn compile(r: Report, gpa: Allocator, rounds: usize) !void {
