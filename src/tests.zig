@@ -3,6 +3,7 @@ test {
     _ = @import("class.zig");
     _ = @import("helpers.zig");
     _ = @import("match.zig");
+    _ = @import("direct.zig");
     _ = @import("testing/direct_test.zig");
     _ = @import("gitignore.zig");
     _ = @import("testing/git_test.zig");

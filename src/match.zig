@@ -14,6 +14,9 @@ pub const inline_units = 1024;
 /// Brackets one `match` call holds; more is `error.PatternTooLong`.
 pub const inline_classes = 64;
 
+/// What one call holds, for the direct executor to hand on what it does not.
+pub const room: direct.Room = .{ .units = inline_units, .brackets = inline_classes };
+
 /// Ranges of non-ASCII members those brackets hold together.
 pub const inline_ranges = 128;
 
@@ -40,15 +43,29 @@ pub const Storage = struct {
 /// Whether `pattern` matches all of `subject`. Allocates nothing: a plain
 /// pattern is read straight from its text, and any other is built on about
 /// 16 KiB of stack (`@sizeOf(Storage)`). Takes patterns up to
-/// `inline_units` units with up to `inline_classes` brackets; longer is
-/// `error.PatternTooLong`, and a compiled `Pattern` takes it. Cost:
-/// O(len(pattern) + len(subject) × states).
-pub fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
-    // A thin entry: each path keeps its own frame, so the common one, a
-    // short plain pattern, pays for no other.
-    if (pattern.len > inline_units and tooLong(pattern, options)) return error.PatternTooLong;
+/// `inline_units` units with up to `inline_classes` brackets, whichever
+/// reader would take them; longer is `error.PatternTooLong`, and a compiled
+/// `Pattern` takes it. Cost: O(len(pattern) + len(subject) × states).
+/// Inline, so that options known at compile time choose the reader at
+/// compile time.
+pub inline fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
+    // Inlined, the strings would be known at compile time wherever the
+    // caller's are; they are read at run time.
+    var p = pattern;
+    var s = subject;
+    _ = .{ &p, &s };
     // Plain patterns need no automaton, and most real ones are plain.
-    if (direct.plan(pattern, options)) |how| return direct.match(pattern, subject, options, how);
+    return switch (direct.match(p, s, options, room)) {
+        .no => false,
+        .yes => true,
+        .automaton => general(p, s, options),
+    };
+}
+
+/// `match` for a pattern the direct executor hands on: one too long for
+/// the call, or one the automaton reads.
+noinline fn general(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
+    if (pattern.len > inline_units and tooLong(pattern, options)) return error.PatternTooLong;
     return automaton(pattern, subject, options);
 }
 

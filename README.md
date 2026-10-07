@@ -103,14 +103,16 @@ NFA is the fallback that keeps the bound. A set hashes the literal entries (whol
 paths, base names, extensions, directory prefixes, path suffixes) and runs the
 rest as one lazy DFA whose states a per-thread cache builds on first use.
 
-`match` reads a plain pattern straight from its text: bytes, `?`, `*`, `**`, and
-brackets of bytes and ranges with case kept, with no escape or brace. The last `*`
-in a component and the last `**` over components are its only retry points, which
-keeps the bound, and with up to eight runs of `*` it is faster than the automaton,
-which runs those retries side by side in machine words. Any other pattern it builds
-as the automaton on the stack, in about 16 KiB. Neither allocates. `match` takes
-patterns up to 1024 units with up to 64 brackets; a longer one is
-`error.PatternTooLong` and compiles as a `Pattern`. A `Pattern` takes up to
+`match` reads a plain pattern straight from its text, only as far as the answer
+needs: bytes, `?`, `*`, `**`, and brackets of bytes and ranges with case kept, with
+no escape or brace. Stars split a component into segments; a star before the last
+takes exactly what that segment leaves, and a star before any other the least it
+can, so a component is read once, and the last `**` over components is the one
+retry point, which keeps the bound. Any other pattern it builds as the automaton on
+the stack, in about 16 KiB. Neither allocates, and `match` is inline, so options
+known at compile time choose the reader at compile time. `match` takes patterns up
+to 1024 units with up to 64 brackets, whichever reader would take them; a longer one
+is `error.PatternTooLong` and compiles as a `Pattern`. A `Pattern` takes up to
 8192 units (`Pattern.max_units`) and runs its NFA on the caller's stack, in about
 8 KiB, so any number of threads query it with nothing shared; a longer pattern is
 `error.PatternTooLong`, and a `Set` of one entry takes it. `Pattern` and `Set`
