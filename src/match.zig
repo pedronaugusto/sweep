@@ -6,6 +6,7 @@ const program = @import("program.zig");
 const parse = @import("parse.zig");
 const nfa = @import("nfa.zig");
 const strategy = @import("strategy.zig");
+const direct = @import("direct.zig");
 
 /// The longest pattern, in units, that `match` always takes.
 pub const inline_units = 1024;
@@ -36,17 +37,33 @@ pub const Storage = struct {
     kernel: [max_words]u64,
 };
 
-/// Whether `pattern` matches all of `subject`. Allocates nothing: it uses
-/// about 16 KiB of stack (`@sizeOf(Storage)`). Takes patterns up to
+/// Whether `pattern` matches all of `subject`. Allocates nothing: a plain
+/// pattern is read straight from its text, and any other is built on about
+/// 16 KiB of stack (`@sizeOf(Storage)`). Takes patterns up to
 /// `inline_units` units with up to `inline_classes` brackets; longer is
 /// `error.PatternTooLong`, and a compiled `Pattern` takes it. Cost:
 /// O(len(pattern) + len(subject) × states).
 pub fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
-    const utf8 = options.syntax.unit == .utf8;
-    if (pattern.len > inline_units and unit.count(utf8, pattern) > inline_units) {
-        if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
-        return error.PatternTooLong;
-    }
+    // A thin entry: each path keeps its own frame, so the common one, a
+    // short plain pattern, pays for no other.
+    if (pattern.len > inline_units and tooLong(pattern, options)) return error.PatternTooLong;
+    // Plain patterns need no automaton, and most real ones are plain.
+    if (direct.literalText(options)) return direct.literal(pattern, subject);
+    if (direct.applies(pattern, options)) return direct.match(pattern, subject, options);
+    return automaton(pattern, subject, options);
+}
+
+/// Whether a pattern of more than `inline_units` bytes is more than that many
+/// units, filling the diagnostic when it is.
+noinline fn tooLong(pattern: []const u8, options: syntax.Options) bool {
+    if (unit.count(options.syntax.unit == .utf8, pattern) <= inline_units) return false;
+    if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
+    return true;
+}
+
+/// `match` by parse and simulation. Its own frame: the 16 KiB of storage is
+/// set up only for a pattern the direct executor does not take.
+noinline fn automaton(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
     var storage: Storage = undefined;
     var b: program.Builder = .{
         .nodes = &storage.nodes,

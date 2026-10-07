@@ -103,9 +103,14 @@ NFA is the fallback that keeps the bound. A set hashes the literal entries (whol
 paths, base names, extensions, directory prefixes, path suffixes) and runs the
 rest as one lazy DFA whose states a per-thread cache builds on first use.
 
-`match` builds the automaton on the stack, in about 16 KiB, and allocates
-nothing. It takes patterns up to 1024 units with up to 64 brackets; a longer one
-is `error.PatternTooLong` and compiles as a `Pattern`. A `Pattern` takes up to
+`match` reads a plain pattern straight from its text: bytes, `?`, `*`, `**`, and
+brackets of bytes and ranges with case kept, with no escape or brace. The last `*`
+in a component and the last `**` over components are its only retry points, which
+keeps the bound, and with up to eight runs of `*` it is faster than the automaton,
+which runs those retries side by side in machine words. Any other pattern it builds
+as the automaton on the stack, in about 16 KiB. Neither allocates. `match` takes
+patterns up to 1024 units with up to 64 brackets; a longer one is
+`error.PatternTooLong` and compiles as a `Pattern`. A `Pattern` takes up to
 8192 units (`Pattern.max_units`) and runs its NFA on the caller's stack, in about
 8 KiB, so any number of threads query it with nothing shared; a longer pattern is
 `error.PatternTooLong`, and a `Set` of one entry takes it. `Pattern` and `Set`
@@ -202,8 +207,8 @@ vectors are committed as data, and a port of git's matcher is the reference: ran
 patterns and subjects over git's alphabet must get the same answer from sweep in
 all four git modes. A naive backtracking matcher, written from the rules above, is
 the oracle for every other dialect and case. Compiled patterns are held to the
-one-shot matcher executor by executor, `ancestor` and `leadsTo` to brute force, and
-sets to their entries matched one by one, `ancestors` included, also with a cache
+one-shot matcher executor by executor, the direct reading of plain patterns to the
+NFA, `ancestor` and `leadsTo` to brute force, and sets to their entries matched one by one, `ancestors` included, also with a cache
 so small that queries finish on the NFA. The step bound is asserted on the shapes
 that make backtracking exponential, at 4096 units. Every
 allocation failure in building is survived without a leak, queries are counted to
@@ -213,8 +218,8 @@ further.
 
 `zig build bench -- [--smoke] [--json]` times sweep's own workloads in ReleaseFast:
 single patterns one-shot and compiled over a synthetic tree, compile times, set
-queries at 100 to 10,000 entries, and the adversarial shapes. CI compiles the
-benchmarks and never times them.
+queries at 100 to 10,000 entries, and the adversarial shapes, each the best of 50
+calls. CI compiles the benchmarks and never times them.
 
 ## Licence
 

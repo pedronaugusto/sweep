@@ -16,6 +16,7 @@ pub const layers: []const gantry.rules.Layer = &.{
         "src/parse.zig",
         "src/nfa.zig",
         "src/strategy.zig",
+        "src/direct.zig",
         "src/helpers.zig",
     } },
     .{ .name = "one-shot, DFA states and hashed literals", .patterns = &.{
