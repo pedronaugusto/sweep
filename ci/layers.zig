@@ -12,13 +12,26 @@ pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "automaton", .patterns = &.{
         "src/program.zig",
     } },
-    .{ .name = "parser and executor", .patterns = &.{
+    .{ .name = "parser, executor and literals", .patterns = &.{
         "src/parse.zig",
         "src/nfa.zig",
-    } },
-    .{ .name = "matching and helpers", .patterns = &.{
-        "src/match.zig",
+        "src/strategy.zig",
         "src/helpers.zig",
+    } },
+    .{ .name = "one-shot, DFA states and hashed literals", .patterns = &.{
+        "src/match.zig",
+        "src/dfa.zig",
+        "src/tables.zig",
+    } },
+    .{ .name = "compiled patterns and lazy DFAs", .patterns = &.{
+        "src/pattern.zig",
+        "src/lazy.zig",
+    } },
+    .{ .name = "sets", .patterns = &.{
+        "src/set.zig",
+    } },
+    .{ .name = "line grammar", .patterns = &.{
+        "src/gitignore.zig",
     } },
     .{ .name = "public", .patterns = &.{
         "src/sweep.zig",
@@ -43,8 +56,15 @@ pub const required = [_][]const u8{
     "src/program.zig",
     "src/parse.zig",
     "src/nfa.zig",
-    "src/match.zig",
+    "src/strategy.zig",
     "src/helpers.zig",
+    "src/match.zig",
+    "src/dfa.zig",
+    "src/tables.zig",
+    "src/pattern.zig",
+    "src/lazy.zig",
+    "src/set.zig",
+    "src/gitignore.zig",
     "src/sweep.zig",
     "src/tests.zig",
 };

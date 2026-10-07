@@ -28,16 +28,21 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(library);
     check.dependOn(&library.step);
     check.dependOn(&example.step);
-    // The benchmarks: built by `check`, timed only by hand with `zig build
-    // bench -Doptimize=ReleaseFast`.
-    const bench = b.addExecutable(.{
-        .name = "bench",
-        .root_module = b.createModule(.{ .root_source_file = b.path("bench/main.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "sweep", .module = module }} }),
-    });
-    check.dependOn(&bench.step);
-    const bench_run = b.addRunArtifact(bench);
-    bench_run.addPassthruArgs();
-    b.step("bench", "Time sweep's own workloads (by hand; CI only compiles them)").dependOn(&bench_run.step);
+    // The benchmarks: `check` compiles them in the requested mode, and
+    // `zig build bench` runs them in ReleaseFast. CI never times them.
+    const bench_step = b.step("bench", "Time sweep's own workloads in ReleaseFast (by hand; CI only compiles them)");
+    for ([_]std.lang.Optimize{ .fast, optimize }, 0..) |mode, i| {
+        const sweep_module = if (i == 0) b.createModule(.{ .root_source_file = b.path("src/sweep.zig"), .target = target, .optimize = mode }) else module;
+        const bench = b.addExecutable(.{
+            .name = "bench",
+            .root_module = b.createModule(.{ .root_source_file = b.path("bench/main.zig"), .target = target, .optimize = mode, .imports = &.{.{ .name = "sweep", .module = sweep_module }} }),
+        });
+        if (i == 0) {
+            const run = b.addRunArtifact(bench);
+            run.addPassthruArgs();
+            bench_step.dependOn(&run.step);
+        } else check.dependOn(&bench.step);
+    }
     // No OS calls: the matcher builds for a target with no OS at all.
     const freestanding = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     const object = b.addObject(.{

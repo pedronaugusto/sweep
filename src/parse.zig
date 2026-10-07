@@ -66,6 +66,8 @@ const Parser = struct {
 
     fn run(p: *Parser, entry: Entry) RunError!void {
         const sx = p.options.syntax;
+        // A hidden leading dot makes every wildcard look one unit back.
+        if (p.reading.leading_dot) p.b.uses_start = true;
         if (p.options.anywhere and !hasSeparator(p.pattern, sx)) {
             // `**/` before a pattern that can only match one component.
             _ = try p.b.emit(.gstar, 0);

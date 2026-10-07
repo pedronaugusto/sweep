@@ -17,6 +17,20 @@
       "imports": [
         "sweep"
       ]
+    },
+    "zig build docs -- pattern": {
+      "source": "examples/usage.zig",
+      "region": "pattern",
+      "imports": [
+        "sweep"
+      ]
+    },
+    "zig build docs -- set": {
+      "source": "examples/usage.zig",
+      "region": "set",
+      "imports": [
+        "sweep"
+      ]
     }
   },
   "ziglint_exceptions": "ci/ziglint-exceptions.json",

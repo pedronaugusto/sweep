@@ -3,6 +3,8 @@
 const syntax = @import("syntax.zig");
 const match_mod = @import("match.zig");
 const helpers = @import("helpers.zig");
+const pattern_mod = @import("pattern.zig");
+const set_mod = @import("set.zig");
 
 /// One glob dialect, field by field, with presets.
 pub const Syntax = syntax.Syntax;
@@ -19,6 +21,19 @@ pub const PatternError = syntax.PatternError;
 pub const match = match_mod.match;
 /// The longest pattern, in units, `match` always takes.
 pub const inline_units = match_mod.inline_units;
+
+/// A pattern compiled once and matched many times.
+pub const Pattern = pattern_mod.Pattern;
+/// Why a pattern cannot be compiled.
+pub const CompileError = pattern_mod.CompileError;
+
+/// Many patterns matched in one pass.
+pub const Set = set_mod.Set;
+/// Whether a subject is a file or a directory.
+pub const Kind = set_mod.Kind;
+
+/// The line grammar of gitignore files.
+pub const gitignore = @import("gitignore.zig");
 
 /// Whether a byte has meaning outside brackets.
 pub const isSpecial = helpers.isSpecial;

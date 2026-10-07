@@ -5,6 +5,7 @@ const syntax = @import("syntax.zig");
 const program = @import("program.zig");
 const parse = @import("parse.zig");
 const nfa = @import("nfa.zig");
+const strategy = @import("strategy.zig");
 
 /// The longest pattern, in units, that `match` always takes.
 pub const inline_units = 1024;
@@ -17,6 +18,10 @@ pub const inline_ranges = 128;
 
 /// Brace groups open at once in one `match` call.
 pub const inline_depth = 256;
+
+/// Bytes of literal a call compares directly; longer literals go through
+/// the automaton.
+const inline_literal = 512;
 
 const max_nodes = 2 * inline_units + 4;
 const max_words = nfa.words(max_nodes);
@@ -51,6 +56,21 @@ pub fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) 
     };
     try parse.parse(&b, pattern, options, .{});
     const p = b.program(.of(options));
+    // A literal strategy decides most real patterns with a few compares,
+    // and the required prefix and suffix turn most others away early.
+    const shape = strategy.recognise(p);
+    var literal: [inline_literal]u8 = undefined;
+    if (shape.strategy) |kind| {
+        if (strategy.bytesInto(p, shape.first, shape.end, &literal)) |lit| {
+            return (strategy.Strategy{ .kind = kind, .literal = lit }).matches(p.reading, subject);
+        }
+    } else if (strategy.bytesInto(p, 0, shape.head, literal[0 .. inline_literal / 2])) |head| {
+        if (strategy.bytesInto(p, shape.tail_start, p.nodes.len - 1, literal[inline_literal / 2 ..])) |tail| {
+            if (subject.len < head.len + tail.len) return false;
+            if (!strategy.eql(p.reading, subject[0..head.len], head)) return false;
+            if (!strategy.eql(p.reading, subject[subject.len - tail.len ..], tail)) return false;
+        }
+    }
     const n = nfa.words(p.nodes.len);
     var sim: nfa.Sim = .init(p, .{
         .reach = .{ storage.reach[0][0..n], storage.reach[1][0..n], storage.reach[2][0..n] },
