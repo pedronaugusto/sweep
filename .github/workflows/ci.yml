@@ -25,16 +25,16 @@ permissions:
 jobs:
   skip:
     if: github.event_name != 'push'
-    uses: pedronaugusto/preflight/.github/workflows/skip.yml@affa6b7758bef301fd904eebcd8a6fb61e162332
+    uses: pedronaugusto/preflight/.github/workflows/skip.yml@045cd2d68a7a9be3c03a6175744f639fc4751718
     with:
       tier: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || 'merge' }}
-      preflight-ref: affa6b7758bef301fd904eebcd8a6fb61e162332
+      preflight-ref: 045cd2d68a7a9be3c03a6175744f639fc4751718
   gate:
     needs: skip
     if: always() && (github.event_name == 'push' || (needs.skip.result == 'success' && needs.skip.outputs.docs-only != 'true'))
-    uses: pedronaugusto/preflight/.github/workflows/zig.yml@affa6b7758bef301fd904eebcd8a6fb61e162332
+    uses: pedronaugusto/preflight/.github/workflows/zig.yml@045cd2d68a7a9be3c03a6175744f639fc4751718
     with:
-      preflight-ref: affa6b7758bef301fd904eebcd8a6fb61e162332
+      preflight-ref: 045cd2d68a7a9be3c03a6175744f639fc4751718
       tier: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || 'merge' }}
       adopt: ${{ github.event_name == 'workflow_dispatch' && inputs.adopt }}
       attest: ${{ github.event_name == 'push' }}
