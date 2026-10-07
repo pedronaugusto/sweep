@@ -3,6 +3,7 @@
 const std = @import("std");
 const sweep = @import("../sweep.zig");
 const gen = @import("gen.zig");
+const pattern_mod = @import("../pattern.zig");
 
 // The property loops build thousands of patterns; the testing allocator's
 // bookkeeping would dominate them. Leaks and failures are allocation_test's.
@@ -29,8 +30,8 @@ fn enginesOne(s: gen.Source) anyerror!void {
     for (0..4) |_| {
         const text = gen.string(s, &text_buf, &gen.any_text);
         const want = try sweep.match(pattern, text, options);
-        for ([_]Pattern.Executor{ .fastest, .strategy, .dfa, .nfa }) |executor| {
-            if (p.matchesWith(text, executor) != want) {
+        for ([_]pattern_mod.Executor{ .fastest, .strategy, .dfa, .nfa }) |executor| {
+            if (pattern_mod.matchesBy(&p, text, executor) != want) {
                 std.debug.print("engines: \"{f}\" vs \"{f}\" ({any}) {t}: want {}\n", .{ std.zig.fmtString(pattern), std.zig.fmtString(text), options, executor, want });
                 return error.TestUnexpectedResult;
             }
@@ -182,14 +183,27 @@ test "patterns past the eager DFA's cap keep their NFA" {
     try std.testing.expect(p.matches(text));
 }
 
-test "a pattern larger than the stack scratch shares its own" {
+test "a pattern at the longest runs its NFA on the stack, and a longer one is a set's" {
     var pattern: std.ArrayList(u8) = .empty;
     defer pattern.deinit(gpa);
-    for (0..3000) |_| try pattern.appendSlice(gpa, "?*");
+    for (0..Pattern.max_units / 2) |_| try pattern.appendSlice(gpa, "?*");
     var p: Pattern = try .compile(gpa, pattern.items, .{});
     defer p.deinit();
-    try std.testing.expect(p.shared != null);
-    const yes = gen.repeat("x", 3000);
-    try std.testing.expect(p.matchesWith(yes, .nfa));
-    try std.testing.expect(!p.matchesWith(yes[0..2999], .nfa));
+    const yes = gen.repeat("x", Pattern.max_units / 2);
+    try std.testing.expect(pattern_mod.matchesBy(&p, yes, .nfa));
+    try std.testing.expect(!pattern_mod.matchesBy(&p, yes[0 .. yes.len - 1], .nfa));
+    // One unit more: refused, with the reason, and a set of one entry takes it.
+    try pattern.append(gpa, 'x');
+    var diagnostics: sweep.Diagnostics = .{ .reason = .unclosed_brace };
+    try std.testing.expectError(error.PatternTooLong, Pattern.compile(gpa, pattern.items, .{ .diagnostics = &diagnostics }));
+    try std.testing.expectEqual(sweep.Diagnostics.Reason.too_long, diagnostics.reason);
+    var builder: sweep.Set.Builder = .init(gpa);
+    defer builder.deinit();
+    _ = try builder.add(pattern.items, .{});
+    var set = try builder.build();
+    defer set.deinit();
+    var cache: sweep.Set.Cache = try .init(gpa, &set, .{});
+    defer cache.deinit();
+    try std.testing.expect(set.any(&cache, yes ++ "x", .file));
+    try std.testing.expect(!set.any(&cache, yes, .file));
 }

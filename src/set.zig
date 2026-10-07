@@ -47,10 +47,12 @@ pub const Builder = struct {
         strategy: ?strategy_mod.Strategy,
     };
 
+    /// An empty builder whose entries and set come from `gpa`.
     pub fn init(gpa: Allocator) Builder {
         return .{ .gpa = gpa, .entries = .empty };
     }
 
+    /// Frees the entries not yet built.
     pub fn deinit(b: *Builder) void {
         for (b.entries.items) |e| {
             b.gpa.free(e.pattern);
@@ -155,6 +157,7 @@ pub const Set = struct {
     /// Private: where `ancestors` stops.
     separator: ?u8,
 
+    /// Frees the set; caches made for it are no use afterwards.
     pub fn deinit(s: *Set) void {
         for (s.parts) |*p| p.deinit(s.gpa);
         s.gpa.free(s.parts);
@@ -162,6 +165,7 @@ pub const Set = struct {
         s.* = undefined;
     }
 
+    /// How many entries the set holds.
     pub fn len(s: *const Set) u32 {
         return s.count;
     }
@@ -181,6 +185,11 @@ pub const Set = struct {
             capacity: usize = 1 << 21,
         };
 
+        /// Counts that show how a cache is doing: states built, clears,
+        /// and queries finished on the NFA.
+        pub const Stats = lazy.Stats;
+
+        /// A cache for queries on `s` from one thread, allocated once.
         pub fn init(gpa: Allocator, s: *const Set, options: Options) Allocator.Error!Set.Cache {
             const parts = try gpa.alloc(PartCache, s.parts.len);
             var done: usize = 0;
@@ -195,6 +204,7 @@ pub const Set = struct {
             return .{ .gpa = gpa, .parts = parts };
         }
 
+        /// Frees the cache.
         pub fn deinit(c: *Cache) void {
             for (c.parts) |*p| p.lazy.deinit(c.gpa);
             c.gpa.free(c.parts);
@@ -202,8 +212,9 @@ pub const Set = struct {
         }
 
         /// States built, clears and NFA fallbacks so far, over all readings.
-        pub fn stats(c: *const Cache) lazy.Stats {
-            var total: lazy.Stats = .{};
+        /// Clears mean the capacity is short for the subjects queried.
+        pub fn stats(c: *const Cache) Stats {
+            var total: Stats = .{};
             for (c.parts) |p| {
                 total.states += p.lazy.stats.states;
                 total.clears += p.lazy.stats.clears;
@@ -318,6 +329,7 @@ pub const Set = struct {
             leads: bool,
         };
 
+        /// The next prefix, or null after the whole subject.
         pub fn next(a: *Ancestors) ?Step {
             if (a.done) return null;
             const s = a.set;

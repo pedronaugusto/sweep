@@ -2,6 +2,7 @@
 //! query allocates.
 const std = @import("std");
 const sweep = @import("../sweep.zig");
+const pattern_mod = @import("../pattern.zig");
 
 const Set = sweep.Set;
 const Pattern = sweep.Pattern;
@@ -54,7 +55,7 @@ test "Pattern queries allocate nothing" {
         const before = failing.allocations;
         for (subjects) |subject| {
             _ = p.matches(subject);
-            _ = p.matchesWith(subject, .nfa);
+            _ = pattern_mod.matchesBy(&p, subject, .nfa);
             _ = p.ancestor(subject);
             _ = p.leadsTo(subject);
         }

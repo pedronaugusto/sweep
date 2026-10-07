@@ -18,9 +18,10 @@ const Program = program_mod.Program;
 pub const max_dfa_states = 64;
 /// Most transitions (states × unit classes) the eager DFA holds.
 pub const max_dfa_cells = 4096;
-/// Patterns with up to this many nodes run their NFA on stack scratch;
-/// larger ones share one owned scratch, taken in turn.
-const stack_nodes = 4096;
+/// Most nodes a pattern's automaton has: two a unit at most, the
+/// `anywhere` prefix and the accept. Its NFA runs on stack scratch sized
+/// for them, so queries share nothing and allocate nothing.
+const max_nodes = 2 * Pattern.max_units + 4;
 
 /// Why a pattern cannot be compiled.
 pub const CompileError = errors: {
@@ -31,9 +32,10 @@ pub const CompileError = errors: {
 /// A pattern compiled once and matched many times. Immutable after
 /// `compile`; any number of threads may query it at once.
 pub const Pattern = struct {
-    /// How a query runs. `matches` takes the fastest that applies; the
-    /// others are for comparing executors.
-    pub const Executor = enum { fastest, strategy, dfa, nfa };
+    /// The longest pattern, in units, `compile` takes. A query that runs
+    /// the NFA keeps it on the stack, in about 8 KiB at this length; a
+    /// `Set` of one entry takes a longer pattern.
+    pub const max_units = 8192;
 
     /// Private: the allocator everything below came from.
     gpa: Allocator,
@@ -61,11 +63,14 @@ pub const Pattern = struct {
     eager: ?Eager,
     /// Private: the walk base, unescaped.
     base_text: []u8,
-    /// Private: NFA scratch for a pattern too large for the stack.
-    shared: ?*Shared,
 
-    /// Compiles `pattern`, which is copied: nothing stays borrowed.
+    /// Compiles `pattern`, which is copied: nothing stays borrowed. Longer
+    /// than `max_units` units is `error.PatternTooLong`.
     pub fn compile(gpa: Allocator, pattern: []const u8, options: syntax.Options) CompileError!Pattern {
+        if (pattern.len > max_units and unit.count(options.syntax.unit == .utf8, pattern) > max_units) {
+            if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
+            return error.PatternTooLong;
+        }
         const bounds: program_mod.Bounds = .of(pattern);
         var b: program_mod.Builder = .{
             .nodes = try gpa.alloc(program_mod.Node, bounds.nodes),
@@ -96,7 +101,6 @@ pub const Pattern = struct {
             .literals = &.{},
             .eager = null,
             .base_text = &.{},
-            .shared = null,
         };
         errdefer p.deinit();
         p.classes = try gpa.dupe(program_mod.Class, b.classes[0..b.class_len]);
@@ -106,10 +110,11 @@ pub const Pattern = struct {
         try p.literal(prog);
         p.base_text = try baseOf(gpa, pattern, options);
         if (p.strategy == null) p.eager = try Eager.build(gpa, prog, p.live);
-        if (p.nodes.len > stack_nodes) p.shared = try Shared.create(gpa, p.nodes.len);
+        std.debug.assert(p.nodes.len <= max_nodes);
         return p;
     }
 
+    /// Frees everything `compile` allocated.
     pub fn deinit(p: *Pattern) void {
         const gpa = p.gpa;
         gpa.free(p.nodes);
@@ -119,29 +124,12 @@ pub const Pattern = struct {
         gpa.free(p.literals);
         gpa.free(p.base_text);
         if (p.eager) |*e| e.deinit(gpa);
-        if (p.shared) |s| s.destroy(gpa);
         p.* = undefined;
     }
 
     /// Whether `subject` matches. Allocates nothing.
     pub fn matches(p: *const Pattern, subject: []const u8) bool {
-        return p.matchesWith(subject, .fastest);
-    }
-
-    /// Whether `subject` matches, decided by `executor`; `.strategy` and
-    /// `.dfa` fall back to the NFA where the pattern has neither.
-    pub fn matchesWith(p: *const Pattern, subject: []const u8, executor: Executor) bool {
-        if (executor == .fastest or executor == .strategy) {
-            if (p.strategy) |s| return s.matches(p.reading, subject);
-        }
-        if (executor == .fastest) {
-            if (!p.prefilter(subject)) return false;
-        }
-        if (executor != .nfa) if (p.eager) |*e| return e.matches(subject, p.reading);
-        var runner: Runner = undefined;
-        const sim = runner.open(p);
-        defer runner.close(p);
-        return sim.run(subject);
+        return matchesBy(p, subject, .fastest);
     }
 
     /// The end of the shortest prefix of `subject` that ends at a
@@ -161,18 +149,7 @@ pub const Pattern = struct {
             }
             return if (e.accepts(state)) subject.len else null;
         }
-        var runner: Runner = undefined;
-        const sim = runner.open(p);
-        defer runner.close(p);
-        sim.reset();
-        var at: usize = 0;
-        while (at < subject.len) {
-            const u = unit.decode(utf8, subject, at);
-            if (p.reading.isSeparator(u.code) and sim.accepting()) return at;
-            if (!sim.step(u.code)) return null;
-            at += u.len;
-        }
-        return if (sim.accepting()) subject.len else null;
+        return ancestorNfa(p, subject);
     }
 
     /// Whether some subject `dir`, a separator, then anything (possibly
@@ -195,20 +172,7 @@ pub const Pattern = struct {
             };
             return state != Eager.dead;
         }
-        var runner: Runner = undefined;
-        const sim = runner.open(p);
-        defer runner.close(p);
-        sim.reset();
-        var at: usize = 0;
-        while (at < dir.len) {
-            const u = unit.decode(utf8, dir, at);
-            if (!sim.step(u.code)) return false;
-            at += u.len;
-        }
-        if (dir.len > 0) if (sep) |s| if (!sim.step(s)) return false;
-        var it = sim.threads();
-        while (it.next()) |k| if (dfa.alive(p.live, k, sim.start)) return true;
-        return false;
+        return leadsToNfa(p, dir);
     }
 
     /// The leading whole components with no special unit, unescaped: where
@@ -363,48 +327,75 @@ pub const Eager = struct {
     }
 };
 
-/// NFA scratch for a pattern too large for the stack, used by one query at
-/// a time.
-const Shared = struct {
-    busy: std.atomic.Value(bool) = .init(false),
-    words: []u64,
+/// How a query runs, for tests that compare executors: `fastest` is what
+/// `Pattern.matches` takes, and `strategy` and `dfa` fall back to the NFA
+/// where the pattern has neither. Not exported.
+pub const Executor = enum { fastest, strategy, dfa, nfa };
 
-    fn create(gpa: Allocator, nodes: usize) Allocator.Error!*Shared {
-        const s = try gpa.create(Shared);
-        errdefer gpa.destroy(s);
-        s.* = .{ .words = try gpa.alloc(u64, 4 * nfa.words(nodes)) };
-        return s;
+/// Whether `subject` matches `p`, decided by `executor`.
+pub fn matchesBy(p: *const Pattern, subject: []const u8, executor: Executor) bool {
+    if (executor == .fastest or executor == .strategy) {
+        if (p.strategy) |s| return s.matches(p.reading, subject);
     }
-
-    fn destroy(s: *Shared, gpa: Allocator) void {
-        gpa.free(s.words);
-        gpa.destroy(s);
+    if (executor == .fastest) {
+        if (!p.prefilter(subject)) return false;
     }
-};
+    if (executor != .nfa) if (p.eager) |*e| return e.matches(subject, p.reading);
+    return matchesNfa(p, subject);
+}
 
-/// One query's NFA: stack scratch, or the pattern's shared scratch.
-const Runner = struct {
-    stack: [4 * nfa.words(stack_nodes)]u64,
-    sim: nfa.Sim,
+// The NFA paths keep their scratch in their own frames, so the strategy
+// and DFA paths do not carry it.
 
-    fn open(r: *Runner, p: *const Pattern) *nfa.Sim {
+/// One query's NFA scratch, on the stack: every thread has its own.
+const Stack = struct {
+    words: [4 * nfa.words(max_nodes)]u64,
+
+    fn sim(s: *Stack, p: *const Pattern) nfa.Sim {
         const n = nfa.words(p.nodes.len);
-        const words: []u64 = if (p.shared) |s| words: {
-            while (s.busy.cmpxchgWeak(false, true, .acquire, .monotonic) != null) std.atomic.spinLoopHint();
-            break :words s.words;
-        } else r.stack[0 .. 4 * n];
-        r.sim = .init(p.program(), .{
-            .reach = .{ words[0..n], words[n .. 2 * n], words[2 * n .. 3 * n] },
-            .kernel = words[3 * n .. 4 * n],
+        const w = &s.words;
+        return .init(p.program(), .{
+            .reach = .{ w[0..n], w[n .. 2 * n], w[2 * n .. 3 * n] },
+            .kernel = w[3 * n .. 4 * n],
         });
-        return &r.sim;
-    }
-
-    fn close(r: *Runner, p: *const Pattern) void {
-        _ = r;
-        if (p.shared) |s| s.busy.store(false, .release);
     }
 };
+
+noinline fn matchesNfa(p: *const Pattern, subject: []const u8) bool {
+    var stack: Stack = undefined;
+    var sim = stack.sim(p);
+    return sim.run(subject);
+}
+
+noinline fn ancestorNfa(p: *const Pattern, subject: []const u8) ?usize {
+    var stack: Stack = undefined;
+    var sim = stack.sim(p);
+    sim.reset();
+    var at: usize = 0;
+    while (at < subject.len) {
+        const u = unit.decode(p.reading.utf8, subject, at);
+        if (p.reading.isSeparator(u.code) and sim.accepting()) return at;
+        if (!sim.step(u.code)) return null;
+        at += u.len;
+    }
+    return if (sim.accepting()) subject.len else null;
+}
+
+noinline fn leadsToNfa(p: *const Pattern, dir: []const u8) bool {
+    var stack: Stack = undefined;
+    var sim = stack.sim(p);
+    sim.reset();
+    var at: usize = 0;
+    while (at < dir.len) {
+        const u = unit.decode(p.reading.utf8, dir, at);
+        if (!sim.step(u.code)) return false;
+        at += u.len;
+    }
+    if (dir.len > 0) if (p.reading.separator) |s| if (!sim.step(s)) return false;
+    var it = sim.threads();
+    while (it.next()) |k| if (dfa.alive(p.live, k, sim.start)) return true;
+    return false;
+}
 
 /// The walk base of `pattern`: its leading whole components with no
 /// special unit, escapes removed.
