@@ -245,9 +245,13 @@ pub const Cache = struct {
         for (kernel) |k| accepts += @intFromBool(nodes[k].op == .accept);
         const need = kernel.len + c.width() + accepts;
         if (c.state_len >= c.states.len or c.used + need > c.arena.len) {
-            // `kernel` lives in `buf`, never in the arena, so it survives.
+            // `kernel` lives in `buf`, never in the arena, so it survives,
+            // and the empty table has its first slot free. `init` sized the
+            // arena for any state beside the dead one.
             c.clear();
-            return c.intern(kernel, start);
+            slot = @intCast(hash & mask);
+            std.debug.assert(c.state_len < c.states.len);
+            std.debug.assert(c.used + need <= c.arena.len);
         }
         const at = c.alloc(need).?;
         @memcpy(c.arena[at..][0..kernel.len], kernel);
@@ -275,23 +279,30 @@ pub const Cache = struct {
         return id;
     }
 
-    fn startState(c: *Cache) u32 {
+    /// The start state; adds to `steps` the states closed to build it.
+    fn startState(c: *Cache, steps: *u64) u32 {
         if (c.start) |s| return s;
         var st = c.stepper();
         const n = st.start(c.buf);
+        if (std.debug.runtime_safety) steps.* += st.sim.steps;
         const id = c.intern(c.buf[0..n], c.automaton.uses_start);
         c.start = id;
         return id;
     }
 
-    /// The state after `id` consumes `code`.
-    fn next(c: *Cache, id: u32, class: u16, code: unit.Code) u32 {
+    /// The state after `id` consumes `code`. Adds to `steps` one for a
+    /// known transition, or the states closed to build a new one.
+    fn next(c: *Cache, id: u32, class: u16, code: unit.Code, steps: *u64) u32 {
         const row = c.states[id].row + class;
         const known = c.arena[row];
-        if (known != unknown) return known;
+        if (known != unknown) {
+            if (std.debug.runtime_safety) steps.* += 1;
+            return known;
+        }
         const s = c.states[id];
         var st = c.stepper();
         const n = st.next(c.kernelOf(id), s.start, code, c.buf);
+        if (std.debug.runtime_safety) steps.* += @max(1, st.sim.steps);
         const a = c.automaton;
         const generation = c.generation;
         const target = c.intern(c.buf[0..n], a.uses_start and a.reading.isSeparator(code));
@@ -311,9 +322,15 @@ const Run = struct {
     clears: u64,
     built: u64,
     units: u64 = 0,
+    /// Work on the cache, counted in safe builds: a known transition is one
+    /// step, a new state the (node, context) states closed to build it. The
+    /// NFA counts its own after a fallback.
+    steps: u64 = 0,
 
     fn begin(a: *const Automaton, c: *Cache) Run {
-        return .{ .automaton = a, .cache = c, .state = c.startState(), .clears = c.stats.clears, .built = c.stats.states };
+        var r: Run = .{ .automaton = a, .cache = c, .state = undefined, .clears = c.stats.clears, .built = c.stats.states };
+        r.state = c.startState(&r.steps);
+        return r;
     }
 
     /// Consumes `bytes[0..to]`; false once nothing can match.
@@ -329,12 +346,13 @@ const Run = struct {
     }
 
     fn consume(r: *Run, code: unit.Code) bool {
+        defer if (std.debug.runtime_safety) r.checkBound();
+        r.units += 1;
         if (r.sim) |*sim| return sim.step(code);
         const c = r.cache;
         const class = r.automaton.units.?.of(code);
         const before = c.stats.clears;
-        r.state = c.next(r.state, class, code);
-        r.units += 1;
+        r.state = c.next(r.state, class, code, &r.steps);
         if (c.stats.clears != before) {
             // The thrash rule: more than three clears in this query, and
             // more than one new state per ten units since the first.
@@ -347,6 +365,13 @@ const Run = struct {
             return it.next() != null;
         }
         return r.state != dead;
+    }
+
+    /// The bound the design promises, on the cache and the NFA together:
+    /// at most (units + 1) × states steps.
+    fn checkBound(r: *const Run) void {
+        const after = if (r.sim) |sim| sim.steps else 0;
+        std.debug.assert(r.steps + after <= (r.units + 1) * r.automaton.program().states());
     }
 
     fn fallBack(r: *Run) void {

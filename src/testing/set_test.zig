@@ -229,19 +229,39 @@ test "a set whose cache keeps clearing still answers within the bound" {
         _ = try builder.add(buf[0..len], .{});
         try patterns.append(gpa, try .compile(gpa, buf[0..len], .{}));
     }
+    // An `a` some fixed distance from the end: the states remember a
+    // window of the subject, so a long subject keeps building new ones
+    // and the query finishes on the NFA.
+    for (8..14) |width| {
+        var window: [16]u8 = undefined;
+        window[0] = '*';
+        window[1] = 'a';
+        @memset(window[2..][0..width], '?');
+        _ = try builder.add(window[0 .. 2 + width], .{});
+        try patterns.append(gpa, try .compile(gpa, window[0 .. 2 + width], .{}));
+    }
     var set = try builder.build();
     defer set.deinit();
     var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = 0 });
     defer cache.deinit();
-    const subjects = [_][]const u8{ "abcdabcdabcdabcdx", gen.repeat("aaaabbbbccccdddd", 4) ++ "y", gen.repeat("dcbadcbadcba", 8) ++ "z" };
+    var long: [4096]u8 = undefined;
+    for (&long) |*c| c.* = "ab"[r.uintLessThan(usize, 2)];
+    const subjects = [_][]const u8{ "abcdabcdabcdabcdx", gen.repeat("aaaabbbbccccdddd", 4) ++ "y", gen.repeat("dcbadcbadcba", 8) ++ "z", &long };
+    var out: std.ArrayList(u32) = .empty;
+    defer out.deinit(gpa);
     for (subjects) |subject| {
-        var want: ?u32 = null;
-        for (patterns.items, 0..) |*p, i| if (p.matches(subject)) {
-            want = @intCast(i);
-        };
-        try std.testing.expectEqual(want, set.last(&cache, subject, .file));
+        var want: std.ArrayList(u32) = .empty;
+        defer want.deinit(gpa);
+        for (patterns.items, 0..) |*p, i| if (p.matches(subject)) try want.append(gpa, @intCast(i));
+        const last: ?u32 = if (want.items.len > 0) want.items[want.items.len - 1] else null;
+        try std.testing.expectEqual(last, set.last(&cache, subject, .file));
+        out.clearRetainingCapacity();
+        try set.all(gpa, &cache, subject, .file, &out);
+        try std.testing.expectEqualSlices(u32, want.items, out.items);
     }
-    try std.testing.expect(cache.stats().clears > 0);
+    const stats = cache.stats();
+    try std.testing.expect(stats.clears > 0);
+    try std.testing.expect(stats.fallbacks > 0);
 }
 
 test "eight threads share one set, each with its own cache" {
