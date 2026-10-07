@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) void {
             bench_step.dependOn(&run.step);
         } else check.dependOn(&bench.step);
     }
-    // No OS calls: the matcher builds for a target with no OS at all.
+    // No OS calls: the whole package builds for a target with no OS at all.
     const freestanding = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     const object = b.addObject(.{
         .name = "sweep-freestanding",
@@ -54,7 +54,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{.{ .name = "sweep", .module = b.createModule(.{ .root_source_file = b.path("src/sweep.zig"), .target = freestanding, .optimize = .small }) }},
         }),
     });
-    b.step("check-freestanding", "Build the matcher for wasm32-freestanding").dependOn(&object.step);
+    b.step("check-freestanding", "Build every public call for wasm32-freestanding").dependOn(&object.step);
     // CI wiring is this repository's own. preflight is lazy and only the
     // root build asks for it, so a project depending on sweep neither needs
     // nor fetches it.
