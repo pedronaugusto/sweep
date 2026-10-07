@@ -156,16 +156,23 @@ fn adversarial(r: Report, gpa: Allocator, a: Allocator, smoke: bool) !void {
         for (0..case.times) |_| try pattern.appendSlice(a, case.piece);
         try pattern.appendSlice(a, case.tail);
         const options: sweep.Options = .{ .syntax = .glob };
-        const t0 = r.now();
-        const one_shot = try sweep.match(pattern.items, case.subject, options);
-        const t1 = r.now();
+        // One call is a few microseconds: the best of many, so a cold cache
+        // or a timer tick does not decide the row.
         var p: sweep.Pattern = try .compile(gpa, pattern.items, options);
         defer p.deinit();
-        const t2 = r.now();
-        const compiled = p.matches(case.subject);
-        const t3 = r.now();
-        if (one_shot != compiled) return error.EnginesDisagree;
-        try r.line("adversarial", case.name, "one-shot", nsBetween(t0, t1) / 1e3, "us");
-        try r.line("adversarial", case.name, "compiled", nsBetween(t2, t3) / 1e3, "us");
+        var one_shot_ns: f64 = std.math.inf(f64);
+        var compiled_ns: f64 = std.math.inf(f64);
+        for (0..if (smoke) 1 else 50) |_| {
+            const t0 = r.now();
+            const one_shot = try sweep.match(pattern.items, case.subject, options);
+            const t1 = r.now();
+            const compiled = p.matches(case.subject);
+            const t2 = r.now();
+            if (one_shot != compiled) return error.EnginesDisagree;
+            one_shot_ns = @min(one_shot_ns, nsBetween(t0, t1));
+            compiled_ns = @min(compiled_ns, nsBetween(t1, t2));
+        }
+        try r.line("adversarial", case.name, "one-shot", one_shot_ns / 1e3, "us");
+        try r.line("adversarial", case.name, "compiled", compiled_ns / 1e3, "us");
     }
 }
