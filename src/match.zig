@@ -48,8 +48,7 @@ pub fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) 
     // short plain pattern, pays for no other.
     if (pattern.len > inline_units and tooLong(pattern, options)) return error.PatternTooLong;
     // Plain patterns need no automaton, and most real ones are plain.
-    if (direct.literalText(options)) return direct.literal(pattern, subject);
-    if (direct.applies(pattern, options)) return direct.match(pattern, subject, options);
+    if (direct.plan(pattern, options)) |how| return direct.match(pattern, subject, options, how);
     return automaton(pattern, subject, options);
 }
 

@@ -15,40 +15,64 @@ const syntax = @import("syntax.zig");
 /// The most runs of `*` a pattern this executor takes may hold.
 const max_star_runs = 8;
 
-/// Whether `match` can take `pattern` under `options`: bytes, wildcards
-/// that never look at a leading dot, no escape or brace in the pattern,
-/// brackets only of bytes and ranges with case kept, and `/` or no
-/// separator.
-pub inline fn applies(pattern: []const u8, options: syntax.Options) bool {
+/// What `match` needs to know of a pattern it takes.
+pub const Plan = struct {
+    /// The pattern holds a bracket to read as one.
+    brackets: bool = false,
+};
+
+/// How `match` reads `pattern` under `options`, or null when it does not:
+/// it takes bytes, wildcards that never look at a leading dot, no escape or
+/// brace in the pattern, brackets only of bytes and ranges with case kept,
+/// and `/` or no separator.
+pub fn plan(pattern: []const u8, options: syntax.Options) ?Plan {
     const sx = options.syntax;
-    if (sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return false;
-    if (sx.separator) |separator| if (separator != '/') return false;
+    if (sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return null;
+    if (sx.separator) |separator| if (separator != '/') return null;
     // A dialect with no escape, bracket or brace has nothing to look for.
-    if (!sx.escape and sx.brackets == .none and !sx.braces) return true;
-    // Each run of stars is a retry the automaton runs in parallel words and
-    // this executor one at a time: past a few, as in adversarial shapes, the
-    // automaton is faster.
-    var stars: usize = 0;
-    var i: usize = 0;
-    while (i < pattern.len) : (i += 1) switch (pattern[i]) {
-        '*' => if (i == 0 or pattern[i - 1] != '*') {
-            stars += 1;
-            if (stars > max_star_runs) return false;
-        },
-        '\\' => if (sx.escape) return false,
-        '[' => if (sx.brackets != .none) {
-            if (sx.brackets != .strict or options.case != .sensitive) return false;
-            i = (bracketEnd(pattern, i) orelse return false) - 1;
-        },
-        '{', '}', ',' => if (sx.braces) return false,
-        else => {},
-    };
-    return true;
+    if (!sx.escape and sx.brackets == .none and !sx.braces) return .{};
+    // Each run of stars is a retry the automaton runs side by side in words
+    // and this executor one at a time: past a few, as in adversarial shapes,
+    // the automaton is faster. Nine runs need 17 bytes.
+    if (pattern.len > 2 * max_star_runs and starRuns(pattern) > max_star_runs) return null;
+    // The bytes the dialect gives a meaning beyond `*` and `?`, found 16 at
+    // a time: most patterns have none.
+    var found: Plan = .{};
+    var at: usize = 0;
+    while (at < pattern.len) : (at += lanes) {
+        var chunk: [lanes]u8 = @splat('*');
+        const piece = pattern[at..@min(at + lanes, pattern.len)];
+        @memcpy(chunk[0..piece.len], piece);
+        const v: @Vector(lanes, u8) = chunk;
+        if (sx.escape and has(v, '\\')) return null;
+        if (sx.braces and (has(v, '{') or has(v, '}') or has(v, ','))) return null;
+        if (sx.brackets != .none and has(v, '[')) found.brackets = true;
+    }
+    if (found.brackets) {
+        if (sx.brackets != .strict or options.case != .sensitive) return null;
+        var i: usize = 0;
+        while (std.mem.findScalarPos(u8, pattern, i, '[')) |open| i = bracketEnd(pattern, open) orelse return null;
+    }
+    return found;
+}
+
+const lanes = 16;
+
+fn has(v: @Vector(lanes, u8), byte: u8) bool {
+    return @reduce(.Or, v == @as(@Vector(lanes, u8), @splat(byte)));
+}
+
+fn starRuns(pattern: []const u8) usize {
+    var runs: usize = 0;
+    for (pattern, 0..) |c, i| {
+        if (c == '*' and (i == 0 or pattern[i - 1] != '*')) runs += 1;
+    }
+    return runs;
 }
 
 /// Where the bracket opening at `open` ends (after its `]`), read by git's
 /// procedure: an optional `!` or `^`, then members, the first taken whatever
-/// it is, up to a `]`. Null for one `applies` leaves to the automaton: a
+/// it is, up to a `]`. Null for one `plan` leaves to the automaton: a
 /// named class, an escape or a separator in it, or no `]`.
 fn bracketEnd(pattern: []const u8, open: usize) ?usize {
     var at = open + 1;
@@ -87,15 +111,17 @@ fn inBracket(pattern: []const u8, open: usize, end: usize, c: u8) bool {
     return found != negated;
 }
 
-/// Whether `pattern`, which `applies` takes, matches all of `subject`.
-pub noinline fn match(pattern: []const u8, subject: []const u8, options: syntax.Options) bool {
-    return if (options.case == .sensitive) matchAs(false, pattern, subject, options) else matchAs(true, pattern, subject, options);
+/// Whether `pattern`, read by `how`, matches all of `subject`.
+pub noinline fn match(pattern: []const u8, subject: []const u8, options: syntax.Options, how: Plan) bool {
+    const fold = options.case != .sensitive;
+    // Only a case-kept pattern holds a bracket here.
+    if (how.brackets) return matchAs(false, true, pattern, subject, options);
+    return if (fold) matchAs(true, false, pattern, subject, options) else matchAs(false, false, pattern, subject, options);
 }
 
 /// `match` with the case rule fixed, so the compare in the inner loop is one
 /// instruction for the common case.
-fn matchAs(comptime fold: bool, pattern: []const u8, subject: []const u8, options: syntax.Options) bool {
-    const brackets = options.syntax.brackets != .none;
+fn matchAs(comptime fold: bool, comptime brackets: bool, pattern: []const u8, subject: []const u8, options: syntax.Options) bool {
     if (options.syntax.separator == null) return component(fold, brackets, pattern, subject);
     const globstar = options.syntax.globstar == .component;
     // `anywhere` reads a pattern holding no separator as `**/` before it,
@@ -108,7 +134,7 @@ fn matchAs(comptime fold: bool, pattern: []const u8, subject: []const u8, option
         const base = if (std.mem.findScalarLast(u8, subject, '/')) |slash| slash + 1 else 0;
         return component(fold, brackets, piece, subject[base..]);
     }
-    return components(fold, pattern, subject, globstar, brackets);
+    return components(fold, brackets, pattern, subject, globstar);
 }
 
 /// One component of a string, `text[start..stop]`, and whether one follows.
@@ -159,7 +185,7 @@ fn isGlobstar(piece: []const u8) bool {
     return piece.len >= 2 and std.mem.countScalar(u8, piece, '*') == piece.len;
 }
 
-fn components(comptime fold: bool, pattern: []const u8, subject: []const u8, globstar: bool, brackets: bool) bool {
+fn components(comptime fold: bool, comptime brackets: bool, pattern: []const u8, subject: []const u8, globstar: bool) bool {
     var p: Cursor = .init(pattern);
     var s: Cursor = .init(subject);
     // Where the last whole-component `**` resumes: the pattern after it,
@@ -212,7 +238,7 @@ fn tail(p: Cursor, globstar: bool) ?usize {
 /// Whether a pattern with no separator in it matches all of `subject`: `*`
 /// takes any run, `?` one byte, a bracket one of its members when
 /// `brackets`, every other byte itself.
-fn component(comptime fold: bool, brackets: bool, pattern: []const u8, subject: []const u8) bool {
+fn component(comptime fold: bool, comptime brackets: bool, pattern: []const u8, subject: []const u8) bool {
     const none = std.math.maxInt(usize);
     var i: usize = 0;
     var j: usize = 0;
@@ -222,7 +248,7 @@ fn component(comptime fold: bool, brackets: bool, pattern: []const u8, subject: 
     while (j < subject.len) {
         if (i < pattern.len) {
             const c = pattern[i];
-            if (c == '[' and brackets) {
+            if (brackets and c == '[') {
                 const end = bracketEnd(pattern, i).?;
                 if (inBracket(pattern, i, end, subject[j])) {
                     i = end;
@@ -251,17 +277,4 @@ fn component(comptime fold: bool, brackets: bool, pattern: []const u8, subject: 
 
 fn same(comptime fold: bool, a: u8, b: u8) bool {
     return if (fold) std.ascii.toLower(a) == std.ascii.toLower(b) else a == b;
-}
-
-/// Whether `options` read every byte but `*` and `?` as itself, with no
-/// separator and no case rule: a token dialect, where `text` decides alone.
-pub inline fn literalText(options: syntax.Options) bool {
-    const sx = options.syntax;
-    return sx.separator == null and !sx.escape and sx.brackets == .none and !sx.braces and sx.unit == .byte and
-        sx.leading_dot == .ordinary and options.case == .sensitive;
-}
-
-/// `match` for options `literalText` takes.
-pub fn literal(pattern: []const u8, subject: []const u8) bool {
-    return component(false, false, pattern, subject);
 }
