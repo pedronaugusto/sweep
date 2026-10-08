@@ -126,7 +126,7 @@ pub const Compiled = struct {
     pub fn init(pattern: []const u8, options: syntax.Options, brackets: usize, room: Room) ?Compiled {
         if (!supports(pattern, options, room)) return null;
         var roles: u8 = Role.star | Role.any;
-        if (brackets > 0) roles |= Role.bracket | Role.read_brackets;
+        if (brackets > 0 and options.syntax.brackets != .none) roles |= Role.bracket | Role.read_brackets;
         if (options.syntax.separator != null) roles |= Role.separator;
         if (options.syntax.globstar == .component) roles |= Role.globstar;
         return .{ .roles = roles, .fold = options.case != .sensitive, .separated = options.syntax.separator != null, .anywhere = options.anywhere };

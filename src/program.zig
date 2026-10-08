@@ -76,7 +76,7 @@ pub const Reading = struct {
     utf8: bool,
     /// The separator's unit code, or null in text mode.
     separator: ?unit.Code,
-    /// Subject units fold A-Z to a-z before they are compared.
+    /// Subject units are case folded before they are compared.
     fold: bool,
     /// Unicode simple folding rather than ASCII folding.
     unicode: bool,
@@ -100,7 +100,8 @@ pub const Reading = struct {
 
     /// The code a subject unit is compared by.
     pub fn canonical(r: Reading, code: unit.Code) unit.Code {
-        return if (r.unicode) unicode.fold(code) else if (r.fold) unit.fold(code) else code;
+        if (!r.fold) return code;
+        return if (r.unicode) unicode.fold(code) else unit.fold(code);
     }
 
     pub fn isSeparator(r: Reading, code: unit.Code) bool {

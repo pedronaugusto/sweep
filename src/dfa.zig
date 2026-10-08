@@ -423,11 +423,11 @@ fn classReach(class: program_mod.Class, r: program_mod.Reading) struct { other: 
 
 /// The raw codes whose canonical form is `canon`.
 fn preimage(r: program_mod.Reading, canon: Code) [2]?Code {
+    if (!r.fold) return .{ canon, null };
     if (r.unicode) {
         if (unicode.fold(canon) != canon) return .{ null, null };
         return .{ canon, if (unit.isLower(canon)) canon - 32 else null };
     }
-    if (!r.fold) return .{ canon, null };
     if (unit.isUpper(canon)) return .{ null, null };
     if (unit.isLower(canon)) return .{ canon, canon - ('a' - 'A') };
     return .{ canon, null };

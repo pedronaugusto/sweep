@@ -40,6 +40,13 @@ test "complete compiled direct eligibility respects custom separators" {
     try agrees("a*:*", "ax:dir", options, true);
 }
 
+test "complete single-entry Set direct reading keeps disabled brackets literal" {
+    const options: sweep.Options = .{ .syntax = .{ .brackets = .none } };
+    try agrees("a*[xy]", "aabc[xy]", options, true);
+    try agrees("a*[xy]", "aabcx", options, false);
+    try agrees("A*[XY]", "aabc[xy]", .{ .syntax = .{ .brackets = .none }, .case = .ascii }, true);
+}
+
 test "complete editorconfig decimal intervals do not expand" {
     const o: sweep.Options = .{ .syntax = .editorconfig };
     for ([_][]const u8{ "3", "9", "10", "99", "120", "+60" }) |subject| try agrees("{3..120}", subject, o, true);
