@@ -1,9 +1,0 @@
-preflight: assertion density: 7 assertions in 395 functions
-preflight: source quality
-preflight: ziglint
-preflight: namespace layout
-preflight: cast reasons
-preflight: function length
-preflight: documentation
-preflight: test imports
-preflight: package paths

@@ -1,7 +1,0 @@
-Build Summary: 5/5 steps succeeded
-check success
-+- compile test sweep-tests debug native success 4s MaxRSS:598M
-|  +- options cached
-+- compile lib sweep debug native success 116ms MaxRSS:91M
-+- compile exe usage debug native success 2s MaxRSS:321M
-
