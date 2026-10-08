@@ -1,0 +1,1540 @@
+run=1 variant=before
+single       src/main.zig                 one-shot             6.95 ns/path
+single       src/main.zig                 compiled             2.55 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            17.35 ns/path
+single       *.c                          compiled             3.60 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            17.74 ns/path
+single       **/*.rs                      compiled             3.27 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             5.02 ns/path
+single       docs/**                      compiled             3.22 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             6.01 ns/path
+single       drivers/*/Makefile           compiled             5.01 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.13 ns/path
+single       **/[Mm]akefile               compiled             4.74 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.10 ns/path
+single       src/**/test_*.zig            compiled             5.34 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.42 ns/path
+single       ?*.o                         compiled             6.56 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.26 ns/path
+single       *.[ch]                       compiled            10.43 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.86 ns/path
+single       lib/**/util*.h               compiled             5.19 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.45 ns/path
+single       **/kernel/**/*.c             compiled             7.57 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.61 ns/path
+single       net/*/*.c                    compiled             6.47 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.69 ns/path
+single       **/README*                   compiled            11.23 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.72 ns/path
+single       */*/*/*.json                 compiled             7.08 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            33.52 ns/path
+single       [a-m]*/**/*.go               compiled             7.80 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            152.98 ns
+compile      *.c                          compile            242.65 ns
+compile      **/*.rs                      compile            266.67 ns
+compile      docs/**                      compile            303.56 ns
+compile      drivers/*/Makefile           compile            515.10 ns
+compile      **/[Mm]akefile               compile            678.46 ns
+compile      src/**/test_*.zig            compile            472.10 ns
+compile      ?*.o                         compile            270.69 ns
+compile      *.[ch]                       compile            601.44 ns
+compile      lib/**/util*.h               compile            436.50 ns
+compile      **/kernel/**/*.c             compile            423.71 ns
+compile      net/*/*.c                    compile            349.94 ns
+compile      **/README*                   compile            305.13 ns
+compile      */*/*/*.json                 compile            383.88 ns
+compile      [a-m]*/**/*.go               compile            686.44 ns
+set          100 entries                  build                0.13 ms
+set          100 entries                  any (cold)         188.99 ns/path
+set          100 entries                  any                186.44 ns/path
+set          100 entries                  last               187.28 ns/path
+set          100 entries                  all                189.04 ns/path
+set          100 entries                  ancestors          418.33 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.78 ms
+set          1000 entries                 any (cold)         266.48 ns/path
+set          1000 entries                 any                239.85 ns/path
+set          1000 entries                 last               240.63 ns/path
+set          1000 entries                 all                245.65 ns/path
+set          1000 entries                 ancestors          488.94 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.30 ms
+set          10000 entries                any (cold)         675.72 ns/path
+set          10000 entries                any                283.53 ns/path
+set          10000 entries                last               284.45 ns/path
+set          10000 entries                all                287.19 ns/path
+set          10000 entries                ancestors          543.65 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        27.38 us/query
+long repeats ab-star x3000                set any warm        27.42 us/query
+features     integer interval             compile             70.00 us
+features     integer interval             matches             30.77 ns/query
+features     regular extglob              compile             13.67 us
+features     regular extglob              matches             24.92 ns/query
+features     Unicode folding              compile              5.87 us
+features     Unicode folding              matches             30.76 ns/query
+features     capture scratch              init                 1.38 us
+features     captures                     capture            475.00 ns/query
+features     walk 1000 files (half pruned) expand               0.41 ms
+run=1 variant=after
+single       src/main.zig                 one-shot             7.42 ns/path
+single       src/main.zig                 compiled             2.55 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            17.83 ns/path
+single       *.c                          compiled             3.81 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            17.69 ns/path
+single       **/*.rs                      compiled             3.41 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             5.18 ns/path
+single       docs/**                      compiled             3.10 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             6.25 ns/path
+single       drivers/*/Makefile           compiled             4.95 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            19.09 ns/path
+single       **/[Mm]akefile               compiled             4.79 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.40 ns/path
+single       src/**/test_*.zig            compiled             4.78 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.93 ns/path
+single       ?*.o                         compiled             6.36 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.66 ns/path
+single       *.[ch]                       compiled            17.49 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.24 ns/path
+single       lib/**/util*.h               compiled             4.37 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.40 ns/path
+single       **/kernel/**/*.c             compiled             7.44 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.82 ns/path
+single       net/*/*.c                    compiled             4.22 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.14 ns/path
+single       **/README*                   compiled            11.60 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.81 ns/path
+single       */*/*/*.json                 compiled             7.09 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.77 ns/path
+single       [a-m]*/**/*.go               compiled             7.28 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            160.40 ns
+compile      *.c                          compile            272.96 ns
+compile      **/*.rs                      compile            292.40 ns
+compile      docs/**                      compile            325.63 ns
+compile      drivers/*/Makefile           compile            567.13 ns
+compile      **/[Mm]akefile               compile            695.35 ns
+compile      src/**/test_*.zig            compile            504.19 ns
+compile      ?*.o                         compile            291.46 ns
+compile      *.[ch]                       compile            601.29 ns
+compile      lib/**/util*.h               compile            456.08 ns
+compile      **/kernel/**/*.c             compile            453.83 ns
+compile      net/*/*.c                    compile            381.23 ns
+compile      **/README*                   compile            326.44 ns
+compile      */*/*/*.json                 compile            402.15 ns
+compile      [a-m]*/**/*.go               compile            691.56 ns
+set          100 entries                  build                0.18 ms
+set          100 entries                  any (cold)         207.54 ns/path
+set          100 entries                  any                202.28 ns/path
+set          100 entries                  last               201.22 ns/path
+set          100 entries                  all                203.58 ns/path
+set          100 entries                  ancestors          427.19 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.78 ms
+set          1000 entries                 any (cold)         300.46 ns/path
+set          1000 entries                 any                275.48 ns/path
+set          1000 entries                 last               277.03 ns/path
+set          1000 entries                 all                280.64 ns/path
+set          1000 entries                 ancestors          501.14 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.44 ms
+set          10000 entries                any (cold)         741.21 ns/path
+set          10000 entries                any                332.95 ns/path
+set          10000 entries                last               331.72 ns/path
+set          10000 entries                all                340.02 ns/path
+set          10000 entries                ancestors          565.57 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.42 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.46 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        26.58 us/query
+long repeats ab-star x3000                set any warm        26.67 us/query
+features     integer interval             compile             71.33 us
+features     integer interval             matches             33.22 ns/query
+features     regular extglob              compile             13.61 us
+features     regular extglob              matches             25.31 ns/query
+features     Unicode folding              compile              6.02 us
+features     Unicode folding              matches             33.71 ns/query
+features     capture scratch              init                 1.21 us
+features     captures                     capture            517.10 ns/query
+features     walk 1000 files (half pruned) expand               0.36 ms
+run=2 variant=before
+single       src/main.zig                 one-shot             5.29 ns/path
+single       src/main.zig                 compiled             1.94 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            17.31 ns/path
+single       *.c                          compiled             2.99 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            16.18 ns/path
+single       **/*.rs                      compiled             3.01 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.72 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.73 ns/path
+single       drivers/*/Makefile           compiled             5.29 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.44 ns/path
+single       **/[Mm]akefile               compiled             4.81 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.07 ns/path
+single       src/**/test_*.zig            compiled             5.84 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.34 ns/path
+single       ?*.o                         compiled             6.30 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.06 ns/path
+single       *.[ch]                       compiled            10.28 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.85 ns/path
+single       lib/**/util*.h               compiled             6.60 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.51 ns/path
+single       **/kernel/**/*.c             compiled             7.42 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.59 ns/path
+single       net/*/*.c                    compiled             5.15 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.77 ns/path
+single       **/README*                   compiled            11.21 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.54 ns/path
+single       */*/*/*.json                 compiled             7.13 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.71 ns/path
+single       [a-m]*/**/*.go               compiled             7.62 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            139.77 ns
+compile      *.c                          compile            243.46 ns
+compile      **/*.rs                      compile            275.40 ns
+compile      docs/**                      compile            298.77 ns
+compile      drivers/*/Makefile           compile            515.23 ns
+compile      **/[Mm]akefile               compile            670.15 ns
+compile      src/**/test_*.zig            compile            570.67 ns
+compile      ?*.o                         compile            262.35 ns
+compile      *.[ch]                       compile            582.98 ns
+compile      lib/**/util*.h               compile            430.98 ns
+compile      **/kernel/**/*.c             compile            437.85 ns
+compile      net/*/*.c                    compile            352.42 ns
+compile      **/README*                   compile            302.29 ns
+compile      */*/*/*.json                 compile            379.56 ns
+compile      [a-m]*/**/*.go               compile            672.75 ns
+set          100 entries                  build                0.13 ms
+set          100 entries                  any (cold)         187.03 ns/path
+set          100 entries                  any                185.13 ns/path
+set          100 entries                  last               185.19 ns/path
+set          100 entries                  all                187.88 ns/path
+set          100 entries                  ancestors          414.44 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.81 ms
+set          1000 entries                 any (cold)         263.89 ns/path
+set          1000 entries                 any                242.07 ns/path
+set          1000 entries                 last               242.58 ns/path
+set          1000 entries                 all                245.71 ns/path
+set          1000 entries                 ancestors          485.90 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.53 ms
+set          10000 entries                any (cold)         677.20 ns/path
+set          10000 entries                any                286.46 ns/path
+set          10000 entries                last               284.71 ns/path
+set          10000 entries                all                286.82 ns/path
+set          10000 entries                ancestors          541.55 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.00 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.21 us/query
+long repeats ab-star x3000                set any cold        27.46 us/query
+long repeats ab-star x3000                set any warm        27.38 us/query
+features     integer interval             compile             70.31 us
+features     integer interval             matches             30.89 ns/query
+features     regular extglob              compile             13.97 us
+features     regular extglob              matches             24.90 ns/query
+features     Unicode folding              compile              5.87 us
+features     Unicode folding              matches             33.37 ns/query
+features     capture scratch              init                 2.08 us
+features     captures                     capture            481.88 ns/query
+features     walk 1000 files (half pruned) expand               0.37 ms
+run=2 variant=after
+single       src/main.zig                 one-shot             5.96 ns/path
+single       src/main.zig                 compiled             2.12 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            15.35 ns/path
+single       *.c                          compiled             3.22 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.97 ns/path
+single       **/*.rs                      compiled             3.18 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.85 ns/path
+single       docs/**                      compiled             2.93 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.97 ns/path
+single       drivers/*/Makefile           compiled             4.97 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.58 ns/path
+single       **/[Mm]akefile               compiled             4.62 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.35 ns/path
+single       src/**/test_*.zig            compiled             4.30 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.59 ns/path
+single       ?*.o                         compiled             7.09 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.18 ns/path
+single       *.[ch]                       compiled            17.16 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.23 ns/path
+single       lib/**/util*.h               compiled             4.34 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.85 ns/path
+single       **/kernel/**/*.c             compiled             7.52 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.82 ns/path
+single       net/*/*.c                    compiled             4.27 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.04 ns/path
+single       **/README*                   compiled            11.63 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.80 ns/path
+single       */*/*/*.json                 compiled             7.15 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            33.01 ns/path
+single       [a-m]*/**/*.go               compiled             7.22 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            167.27 ns
+compile      *.c                          compile            263.13 ns
+compile      **/*.rs                      compile            285.19 ns
+compile      docs/**                      compile            309.58 ns
+compile      drivers/*/Makefile           compile            548.23 ns
+compile      **/[Mm]akefile               compile            683.13 ns
+compile      src/**/test_*.zig            compile            497.15 ns
+compile      ?*.o                         compile            281.29 ns
+compile      *.[ch]                       compile            597.83 ns
+compile      lib/**/util*.h               compile            458.88 ns
+compile      **/kernel/**/*.c             compile            455.02 ns
+compile      net/*/*.c                    compile            367.81 ns
+compile      **/README*                   compile            329.96 ns
+compile      */*/*/*.json                 compile            405.04 ns
+compile      [a-m]*/**/*.go               compile            689.48 ns
+set          100 entries                  build                0.12 ms
+set          100 entries                  any (cold)         206.17 ns/path
+set          100 entries                  any                202.52 ns/path
+set          100 entries                  last               200.26 ns/path
+set          100 entries                  all                202.61 ns/path
+set          100 entries                  ancestors          424.58 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.79 ms
+set          1000 entries                 any (cold)         302.49 ns/path
+set          1000 entries                 any                277.55 ns/path
+set          1000 entries                 last               276.33 ns/path
+set          1000 entries                 all                281.20 ns/path
+set          1000 entries                 ancestors          505.36 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.44 ms
+set          10000 entries                any (cold)         745.20 ns/path
+set          10000 entries                any                337.59 ns/path
+set          10000 entries                last               346.81 ns/path
+set          10000 entries                all                335.92 ns/path
+set          10000 entries                ancestors          547.79 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        26.58 us/query
+long repeats ab-star x3000                set any warm        26.67 us/query
+features     integer interval             compile             71.13 us
+features     integer interval             matches             31.65 ns/query
+features     regular extglob              compile             14.06 us
+features     regular extglob              matches             25.73 ns/query
+features     Unicode folding              compile              6.07 us
+features     Unicode folding              matches             32.85 ns/query
+features     capture scratch              init                 5.13 us
+features     captures                     capture            514.20 ns/query
+features     walk 1000 files (half pruned) expand               0.39 ms
+run=3 variant=before
+single       src/main.zig                 one-shot             5.36 ns/path
+single       src/main.zig                 compiled             1.93 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.36 ns/path
+single       *.c                          compiled             3.02 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.85 ns/path
+single       **/*.rs                      compiled             2.97 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.70 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.77 ns/path
+single       drivers/*/Makefile           compiled             5.03 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.12 ns/path
+single       **/[Mm]akefile               compiled             4.87 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.07 ns/path
+single       src/**/test_*.zig            compiled             5.32 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.55 ns/path
+single       ?*.o                         compiled             6.34 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.27 ns/path
+single       *.[ch]                       compiled            10.26 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.88 ns/path
+single       lib/**/util*.h               compiled             5.19 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.62 ns/path
+single       **/kernel/**/*.c             compiled             7.46 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.60 ns/path
+single       net/*/*.c                    compiled             5.71 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.75 ns/path
+single       **/README*                   compiled            11.22 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.67 ns/path
+single       */*/*/*.json                 compiled             7.53 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            33.13 ns/path
+single       [a-m]*/**/*.go               compiled             7.86 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            150.56 ns
+compile      *.c                          compile            244.13 ns
+compile      **/*.rs                      compile            270.56 ns
+compile      docs/**                      compile            306.56 ns
+compile      drivers/*/Makefile           compile            505.90 ns
+compile      **/[Mm]akefile               compile            668.06 ns
+compile      src/**/test_*.zig            compile            461.92 ns
+compile      ?*.o                         compile            268.67 ns
+compile      *.[ch]                       compile            590.71 ns
+compile      lib/**/util*.h               compile            427.60 ns
+compile      **/kernel/**/*.c             compile            419.46 ns
+compile      net/*/*.c                    compile            351.88 ns
+compile      **/README*                   compile            301.19 ns
+compile      */*/*/*.json                 compile            377.10 ns
+compile      [a-m]*/**/*.go               compile            669.54 ns
+set          100 entries                  build                0.11 ms
+set          100 entries                  any (cold)         187.52 ns/path
+set          100 entries                  any                185.27 ns/path
+set          100 entries                  last               186.42 ns/path
+set          100 entries                  all                189.40 ns/path
+set          100 entries                  ancestors          420.43 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.80 ms
+set          1000 entries                 any (cold)         260.70 ns/path
+set          1000 entries                 any                241.18 ns/path
+set          1000 entries                 last               243.94 ns/path
+set          1000 entries                 all                245.23 ns/path
+set          1000 entries                 ancestors          489.76 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.39 ms
+set          10000 entries                any (cold)         677.81 ns/path
+set          10000 entries                any                283.57 ns/path
+set          10000 entries                last               283.77 ns/path
+set          10000 entries                all                289.33 ns/path
+set          10000 entries                ancestors          538.10 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        28.54 us/query
+long repeats ab-star x3000                set any warm        28.58 us/query
+features     integer interval             compile             70.46 us
+features     integer interval             matches             30.90 ns/query
+features     regular extglob              compile             13.60 us
+features     regular extglob              matches             25.12 ns/query
+features     Unicode folding              compile              5.88 us
+features     Unicode folding              matches             32.84 ns/query
+features     capture scratch              init                 1.54 us
+features     captures                     capture            474.94 ns/query
+features     walk 1000 files (half pruned) expand               0.38 ms
+run=3 variant=after
+single       src/main.zig                 one-shot             5.51 ns/path
+single       src/main.zig                 compiled             1.90 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            15.48 ns/path
+single       *.c                          compiled             3.24 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.87 ns/path
+single       **/*.rs                      compiled             3.17 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.88 ns/path
+single       docs/**                      compiled             2.93 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.97 ns/path
+single       drivers/*/Makefile           compiled             4.93 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.60 ns/path
+single       **/[Mm]akefile               compiled             4.60 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.37 ns/path
+single       src/**/test_*.zig            compiled             4.46 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            21.25 ns/path
+single       ?*.o                         compiled             7.10 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.37 ns/path
+single       *.[ch]                       compiled            17.31 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.24 ns/path
+single       lib/**/util*.h               compiled             4.48 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.42 ns/path
+single       **/kernel/**/*.c             compiled             8.27 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.82 ns/path
+single       net/*/*.c                    compiled             4.40 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.08 ns/path
+single       **/README*                   compiled            11.59 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.77 ns/path
+single       */*/*/*.json                 compiled             7.15 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.79 ns/path
+single       [a-m]*/**/*.go               compiled             7.29 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            159.58 ns
+compile      *.c                          compile            256.00 ns
+compile      **/*.rs                      compile            283.50 ns
+compile      docs/**                      compile            312.73 ns
+compile      drivers/*/Makefile           compile            551.15 ns
+compile      **/[Mm]akefile               compile            695.75 ns
+compile      src/**/test_*.zig            compile            496.42 ns
+compile      ?*.o                         compile            277.08 ns
+compile      *.[ch]                       compile            593.52 ns
+compile      lib/**/util*.h               compile            440.21 ns
+compile      **/kernel/**/*.c             compile            445.85 ns
+compile      net/*/*.c                    compile            365.25 ns
+compile      **/README*                   compile            321.42 ns
+compile      */*/*/*.json                 compile            402.15 ns
+compile      [a-m]*/**/*.go               compile            682.75 ns
+set          100 entries                  build                0.12 ms
+set          100 entries                  any (cold)         197.79 ns/path
+set          100 entries                  any                194.53 ns/path
+set          100 entries                  last               194.24 ns/path
+set          100 entries                  all                207.24 ns/path
+set          100 entries                  ancestors          427.21 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.78 ms
+set          1000 entries                 any (cold)         276.26 ns/path
+set          1000 entries                 any                274.54 ns/path
+set          1000 entries                 last               275.46 ns/path
+set          1000 entries                 all                274.61 ns/path
+set          1000 entries                 ancestors          501.33 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.41 ms
+set          10000 entries                any (cold)         703.29 ns/path
+set          10000 entries                any                295.03 ns/path
+set          10000 entries                last               291.82 ns/path
+set          10000 entries                all                300.17 ns/path
+set          10000 entries                ancestors          572.98 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        26.58 us/query
+long repeats ab-star x3000                set any warm        26.67 us/query
+features     integer interval             compile             70.66 us
+features     integer interval             matches             31.64 ns/query
+features     regular extglob              compile             13.83 us
+features     regular extglob              matches             25.65 ns/query
+features     Unicode folding              compile              5.99 us
+features     Unicode folding              matches             32.07 ns/query
+features     capture scratch              init                 1.92 us
+features     captures                     capture            516.70 ns/query
+features     walk 1000 files (half pruned) expand               0.37 ms
+run=4 variant=before
+single       src/main.zig                 one-shot             5.44 ns/path
+single       src/main.zig                 compiled             1.97 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.52 ns/path
+single       *.c                          compiled             2.97 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.72 ns/path
+single       **/*.rs                      compiled             3.03 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.72 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.75 ns/path
+single       drivers/*/Makefile           compiled             4.98 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.31 ns/path
+single       **/[Mm]akefile               compiled             4.68 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.09 ns/path
+single       src/**/test_*.zig            compiled             5.45 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.33 ns/path
+single       ?*.o                         compiled             6.43 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.10 ns/path
+single       *.[ch]                       compiled            10.49 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.85 ns/path
+single       lib/**/util*.h               compiled             4.92 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.46 ns/path
+single       **/kernel/**/*.c             compiled             7.69 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.59 ns/path
+single       net/*/*.c                    compiled             5.60 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.84 ns/path
+single       **/README*                   compiled            11.19 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.72 ns/path
+single       */*/*/*.json                 compiled             7.07 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            33.00 ns/path
+single       [a-m]*/**/*.go               compiled             7.67 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            144.25 ns
+compile      *.c                          compile            244.17 ns
+compile      **/*.rs                      compile            266.04 ns
+compile      docs/**                      compile            304.52 ns
+compile      drivers/*/Makefile           compile            512.58 ns
+compile      **/[Mm]akefile               compile            685.85 ns
+compile      src/**/test_*.zig            compile            464.19 ns
+compile      ?*.o                         compile            265.79 ns
+compile      *.[ch]                       compile            606.63 ns
+compile      lib/**/util*.h               compile            423.75 ns
+compile      **/kernel/**/*.c             compile            419.90 ns
+compile      net/*/*.c                    compile            352.58 ns
+compile      **/README*                   compile            299.67 ns
+compile      */*/*/*.json                 compile            371.79 ns
+compile      [a-m]*/**/*.go               compile            675.73 ns
+set          100 entries                  build                0.11 ms
+set          100 entries                  any (cold)         187.01 ns/path
+set          100 entries                  any                185.40 ns/path
+set          100 entries                  last               186.89 ns/path
+set          100 entries                  all                187.01 ns/path
+set          100 entries                  ancestors          421.63 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.79 ms
+set          1000 entries                 any (cold)         262.16 ns/path
+set          1000 entries                 any                241.04 ns/path
+set          1000 entries                 last               242.42 ns/path
+set          1000 entries                 all                247.83 ns/path
+set          1000 entries                 ancestors          512.88 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.27 ms
+set          10000 entries                any (cold)        1776.92 ns/path
+set          10000 entries                any               2116.49 ns/path
+set          10000 entries                last               903.30 ns/path
+set          10000 entries                all                892.07 ns/path
+set          10000 entries                ancestors          617.40 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.29 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.08 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.21 us/query
+long repeats ab-star x3000                set any cold        29.63 us/query
+long repeats ab-star x3000                set any warm        28.75 us/query
+features     integer interval             compile             71.20 us
+features     integer interval             matches             31.48 ns/query
+features     regular extglob              compile             14.00 us
+features     regular extglob              matches             25.45 ns/query
+features     Unicode folding              compile              5.97 us
+features     Unicode folding              matches             35.22 ns/query
+features     capture scratch              init                 3.42 us
+features     captures                     capture            489.88 ns/query
+features     walk 1000 files (half pruned) expand               0.39 ms
+run=4 variant=after
+single       src/main.zig                 one-shot             5.88 ns/path
+single       src/main.zig                 compiled             1.98 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            18.23 ns/path
+single       *.c                          compiled             3.21 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            16.09 ns/path
+single       **/*.rs                      compiled             3.31 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             5.11 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             6.10 ns/path
+single       drivers/*/Makefile           compiled             5.22 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.79 ns/path
+single       **/[Mm]akefile               compiled             4.68 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.38 ns/path
+single       src/**/test_*.zig            compiled             4.26 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            21.27 ns/path
+single       ?*.o                         compiled             7.39 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.63 ns/path
+single       *.[ch]                       compiled            17.64 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.33 ns/path
+single       lib/**/util*.h               compiled             4.38 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.97 ns/path
+single       **/kernel/**/*.c             compiled             7.56 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.91 ns/path
+single       net/*/*.c                    compiled             4.68 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.30 ns/path
+single       **/README*                   compiled            11.87 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            30.43 ns/path
+single       */*/*/*.json                 compiled             7.29 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.98 ns/path
+single       [a-m]*/**/*.go               compiled             7.67 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            165.02 ns
+compile      *.c                          compile            265.02 ns
+compile      **/*.rs                      compile            290.63 ns
+compile      docs/**                      compile            323.85 ns
+compile      drivers/*/Makefile           compile            565.25 ns
+compile      **/[Mm]akefile               compile            708.73 ns
+compile      src/**/test_*.zig            compile            535.42 ns
+compile      ?*.o                         compile            290.19 ns
+compile      *.[ch]                       compile            611.63 ns
+compile      lib/**/util*.h               compile            474.79 ns
+compile      **/kernel/**/*.c             compile            487.73 ns
+compile      net/*/*.c                    compile            385.33 ns
+compile      **/README*                   compile            328.56 ns
+compile      */*/*/*.json                 compile            411.27 ns
+compile      [a-m]*/**/*.go               compile            692.65 ns
+set          100 entries                  build                0.13 ms
+set          100 entries                  any (cold)         200.69 ns/path
+set          100 entries                  any                198.08 ns/path
+set          100 entries                  last               198.68 ns/path
+set          100 entries                  all                200.19 ns/path
+set          100 entries                  ancestors          436.00 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.81 ms
+set          1000 entries                 any (cold)         286.15 ns/path
+set          1000 entries                 any                265.23 ns/path
+set          1000 entries                 last               264.75 ns/path
+set          1000 entries                 all                291.09 ns/path
+set          1000 entries                 ancestors          513.19 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.64 ms
+set          10000 entries                any (cold)         716.34 ns/path
+set          10000 entries                any                307.29 ns/path
+set          10000 entries                last               299.58 ns/path
+set          10000 entries                all                307.13 ns/path
+set          10000 entries                ancestors          584.66 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.00 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.08 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        29.17 us/query
+long repeats ab-star x3000                set any warm        29.00 us/query
+features     integer interval             compile             74.57 us
+features     integer interval             matches             33.44 ns/query
+features     regular extglob              compile             14.92 us
+features     regular extglob              matches             26.64 ns/query
+features     Unicode folding              compile              6.38 us
+features     Unicode folding              matches             34.98 ns/query
+features     capture scratch              init                 3.50 us
+features     captures                     capture            544.25 ns/query
+features     walk 1000 files (half pruned) expand               0.49 ms
+run=5 variant=before
+single       src/main.zig                 one-shot             5.36 ns/path
+single       src/main.zig                 compiled             1.93 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.69 ns/path
+single       *.c                          compiled             3.03 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            23.43 ns/path
+single       **/*.rs                      compiled             3.04 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.87 ns/path
+single       docs/**                      compiled             3.11 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.85 ns/path
+single       drivers/*/Makefile           compiled             5.01 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.98 ns/path
+single       **/[Mm]akefile               compiled             5.23 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.22 ns/path
+single       src/**/test_*.zig            compiled             5.81 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.75 ns/path
+single       ?*.o                         compiled             6.37 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.01 ns/path
+single       *.[ch]                       compiled            10.65 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.95 ns/path
+single       lib/**/util*.h               compiled             5.74 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            36.49 ns/path
+single       **/kernel/**/*.c             compiled             8.40 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.86 ns/path
+single       net/*/*.c                    compiled             5.43 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            14.64 ns/path
+single       **/README*                   compiled            11.44 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            30.28 ns/path
+single       */*/*/*.json                 compiled             7.67 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            33.23 ns/path
+single       [a-m]*/**/*.go               compiled             7.83 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            166.10 ns
+compile      *.c                          compile            249.88 ns
+compile      **/*.rs                      compile            278.69 ns
+compile      docs/**                      compile            302.56 ns
+compile      drivers/*/Makefile           compile            532.08 ns
+compile      **/[Mm]akefile               compile            688.73 ns
+compile      src/**/test_*.zig            compile            467.94 ns
+compile      ?*.o                         compile            262.75 ns
+compile      *.[ch]                       compile            578.90 ns
+compile      lib/**/util*.h               compile            436.52 ns
+compile      **/kernel/**/*.c             compile            423.04 ns
+compile      net/*/*.c                    compile            354.58 ns
+compile      **/README*                   compile            307.19 ns
+compile      */*/*/*.json                 compile            378.73 ns
+compile      [a-m]*/**/*.go               compile            685.33 ns
+set          100 entries                  build                0.13 ms
+set          100 entries                  any (cold)         193.13 ns/path
+set          100 entries                  any                190.69 ns/path
+set          100 entries                  last               190.49 ns/path
+set          100 entries                  all                192.15 ns/path
+set          100 entries                  ancestors          427.02 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.84 ms
+set          1000 entries                 any (cold)         267.13 ns/path
+set          1000 entries                 any                246.80 ns/path
+set          1000 entries                 last               247.86 ns/path
+set          1000 entries                 all                251.19 ns/path
+set          1000 entries                 ancestors          497.95 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.53 ms
+set          10000 entries                any (cold)         692.11 ns/path
+set          10000 entries                any                290.19 ns/path
+set          10000 entries                last               292.08 ns/path
+set          10000 entries                all                294.02 ns/path
+set          10000 entries                ancestors          553.09 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.21 us/query
+long repeats ab-star x3000                set any cold        28.63 us/query
+long repeats ab-star x3000                set any warm        28.54 us/query
+features     integer interval             compile             73.01 us
+features     integer interval             matches             31.48 ns/query
+features     regular extglob              compile             13.76 us
+features     regular extglob              matches             25.59 ns/query
+features     Unicode folding              compile              6.06 us
+features     Unicode folding              matches             32.46 ns/query
+features     capture scratch              init                 2.67 us
+features     captures                     capture            485.42 ns/query
+features     walk 1000 files (half pruned) expand               0.40 ms
+run=5 variant=after
+single       src/main.zig                 one-shot             5.81 ns/path
+single       src/main.zig                 compiled             1.93 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            15.09 ns/path
+single       *.c                          compiled             3.24 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            16.17 ns/path
+single       **/*.rs                      compiled             3.23 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             5.00 ns/path
+single       docs/**                      compiled             2.98 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             6.08 ns/path
+single       drivers/*/Makefile           compiled             5.15 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.49 ns/path
+single       **/[Mm]akefile               compiled             4.68 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.49 ns/path
+single       src/**/test_*.zig            compiled             4.55 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            21.46 ns/path
+single       ?*.o                         compiled             7.37 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            24.73 ns/path
+single       *.[ch]                       compiled            17.69 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.35 ns/path
+single       lib/**/util*.h               compiled             4.55 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            36.11 ns/path
+single       **/kernel/**/*.c             compiled             7.12 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.82 ns/path
+single       net/*/*.c                    compiled             4.35 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.28 ns/path
+single       **/README*                   compiled            11.63 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.90 ns/path
+single       */*/*/*.json                 compiled             7.07 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.90 ns/path
+single       [a-m]*/**/*.go               compiled             7.20 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            160.04 ns
+compile      *.c                          compile            261.19 ns
+compile      **/*.rs                      compile            288.15 ns
+compile      docs/**                      compile            315.33 ns
+compile      drivers/*/Makefile           compile            554.75 ns
+compile      **/[Mm]akefile               compile            681.27 ns
+compile      src/**/test_*.zig            compile            503.96 ns
+compile      ?*.o                         compile            285.04 ns
+compile      *.[ch]                       compile            598.33 ns
+compile      lib/**/util*.h               compile            440.08 ns
+compile      **/kernel/**/*.c             compile            449.02 ns
+compile      net/*/*.c                    compile            365.10 ns
+compile      **/README*                   compile            323.31 ns
+compile      */*/*/*.json                 compile            398.13 ns
+compile      [a-m]*/**/*.go               compile            685.94 ns
+set          100 entries                  build                0.12 ms
+set          100 entries                  any (cold)         197.32 ns/path
+set          100 entries                  any                193.54 ns/path
+set          100 entries                  last               194.34 ns/path
+set          100 entries                  all                195.42 ns/path
+set          100 entries                  ancestors          421.81 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.80 ms
+set          1000 entries                 any (cold)         277.61 ns/path
+set          1000 entries                 any                259.62 ns/path
+set          1000 entries                 last               257.86 ns/path
+set          1000 entries                 all                260.85 ns/path
+set          1000 entries                 ancestors          506.78 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.63 ms
+set          10000 entries                any (cold)         704.00 ns/path
+set          10000 entries                any                296.94 ns/path
+set          10000 entries                last               292.11 ns/path
+set          10000 entries                all                295.24 ns/path
+set          10000 entries                ancestors          550.75 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.63 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.21 us/query
+long repeats ab-star x3000                set any cold        26.67 us/query
+long repeats ab-star x3000                set any warm        26.63 us/query
+features     integer interval             compile             71.11 us
+features     integer interval             matches             31.63 ns/query
+features     regular extglob              compile             13.83 us
+features     regular extglob              matches             25.59 ns/query
+features     Unicode folding              compile              5.98 us
+features     Unicode folding              matches             34.04 ns/query
+features     capture scratch              init                 1.92 us
+features     captures                     capture            517.11 ns/query
+features     walk 1000 files (half pruned) expand               0.37 ms
+run=6 variant=before
+single       src/main.zig                 one-shot             5.33 ns/path
+single       src/main.zig                 compiled             1.89 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            15.47 ns/path
+single       *.c                          compiled             3.04 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            16.10 ns/path
+single       **/*.rs                      compiled             3.00 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.70 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.79 ns/path
+single       drivers/*/Makefile           compiled             5.38 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.24 ns/path
+single       **/[Mm]akefile               compiled             4.76 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.10 ns/path
+single       src/**/test_*.zig            compiled             5.30 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.27 ns/path
+single       ?*.o                         compiled             7.05 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.41 ns/path
+single       *.[ch]                       compiled            11.08 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.86 ns/path
+single       lib/**/util*.h               compiled             5.37 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.49 ns/path
+single       **/kernel/**/*.c             compiled             8.18 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.62 ns/path
+single       net/*/*.c                    compiled             5.66 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.98 ns/path
+single       **/README*                   compiled            11.20 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.67 ns/path
+single       */*/*/*.json                 compiled             7.14 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.82 ns/path
+single       [a-m]*/**/*.go               compiled             7.60 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            145.33 ns
+compile      *.c                          compile            251.25 ns
+compile      **/*.rs                      compile            270.31 ns
+compile      docs/**                      compile            313.33 ns
+compile      drivers/*/Makefile           compile            523.94 ns
+compile      **/[Mm]akefile               compile            668.44 ns
+compile      src/**/test_*.zig            compile            465.29 ns
+compile      ?*.o                         compile            272.21 ns
+compile      *.[ch]                       compile            592.06 ns
+compile      lib/**/util*.h               compile            423.35 ns
+compile      **/kernel/**/*.c             compile            422.85 ns
+compile      net/*/*.c                    compile            348.63 ns
+compile      **/README*                   compile            303.23 ns
+compile      */*/*/*.json                 compile            378.10 ns
+compile      [a-m]*/**/*.go               compile            676.85 ns
+set          100 entries                  build                0.11 ms
+set          100 entries                  any (cold)         188.30 ns/path
+set          100 entries                  any                196.29 ns/path
+set          100 entries                  last               188.49 ns/path
+set          100 entries                  all                188.75 ns/path
+set          100 entries                  ancestors          419.92 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.77 ms
+set          1000 entries                 any (cold)         292.88 ns/path
+set          1000 entries                 any                272.55 ns/path
+set          1000 entries                 last               271.76 ns/path
+set          1000 entries                 all                277.94 ns/path
+set          1000 entries                 ancestors          501.21 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.26 ms
+set          10000 entries                any (cold)         722.59 ns/path
+set          10000 entries                any                336.47 ns/path
+set          10000 entries                last               331.27 ns/path
+set          10000 entries                all                332.57 ns/path
+set          10000 entries                ancestors          560.11 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        27.63 us/query
+long repeats ab-star x3000                set any warm        27.46 us/query
+features     integer interval             compile             70.57 us
+features     integer interval             matches             30.88 ns/query
+features     regular extglob              compile             13.58 us
+features     regular extglob              matches             24.95 ns/query
+features     Unicode folding              compile              5.84 us
+features     Unicode folding              matches             31.06 ns/query
+features     capture scratch              init                 2.46 us
+features     captures                     capture            476.45 ns/query
+features     walk 1000 files (half pruned) expand               0.39 ms
+run=6 variant=after
+single       src/main.zig                 one-shot             5.72 ns/path
+single       src/main.zig                 compiled             1.90 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.79 ns/path
+single       *.c                          compiled             3.18 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.85 ns/path
+single       **/*.rs                      compiled             3.17 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.94 ns/path
+single       docs/**                      compiled             2.94 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.97 ns/path
+single       drivers/*/Makefile           compiled             5.02 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.60 ns/path
+single       **/[Mm]akefile               compiled             4.60 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.41 ns/path
+single       src/**/test_*.zig            compiled             4.80 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            21.68 ns/path
+single       ?*.o                         compiled             7.01 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.55 ns/path
+single       *.[ch]                       compiled            17.60 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.34 ns/path
+single       lib/**/util*.h               compiled             4.63 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.61 ns/path
+single       **/kernel/**/*.c             compiled             7.80 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.84 ns/path
+single       net/*/*.c                    compiled             4.89 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            12.97 ns/path
+single       **/README*                   compiled            11.64 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.59 ns/path
+single       */*/*/*.json                 compiled             7.07 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.98 ns/path
+single       [a-m]*/**/*.go               compiled             7.41 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            170.79 ns
+compile      *.c                          compile            259.71 ns
+compile      **/*.rs                      compile            280.02 ns
+compile      docs/**                      compile            314.15 ns
+compile      drivers/*/Makefile           compile            555.90 ns
+compile      **/[Mm]akefile               compile            692.75 ns
+compile      src/**/test_*.zig            compile            494.33 ns
+compile      ?*.o                         compile            281.33 ns
+compile      *.[ch]                       compile            586.25 ns
+compile      lib/**/util*.h               compile            440.83 ns
+compile      **/kernel/**/*.c             compile            442.85 ns
+compile      net/*/*.c                    compile            366.63 ns
+compile      **/README*                   compile            318.23 ns
+compile      */*/*/*.json                 compile            400.04 ns
+compile      [a-m]*/**/*.go               compile            686.98 ns
+set          100 entries                  build                0.11 ms
+set          100 entries                  any (cold)         203.82 ns/path
+set          100 entries                  any                197.34 ns/path
+set          100 entries                  last               193.34 ns/path
+set          100 entries                  all                196.20 ns/path
+set          100 entries                  ancestors          424.28 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.77 ms
+set          1000 entries                 any (cold)         293.46 ns/path
+set          1000 entries                 any                265.36 ns/path
+set          1000 entries                 last               257.11 ns/path
+set          1000 entries                 all                265.05 ns/path
+set          1000 entries                 ancestors          509.68 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.73 ms
+set          10000 entries                any (cold)         738.35 ns/path
+set          10000 entries                any                311.43 ns/path
+set          10000 entries                last               301.71 ns/path
+set          10000 entries                all                297.69 ns/path
+set          10000 entries                ancestors          565.77 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.38 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.08 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.17 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        26.58 us/query
+long repeats ab-star x3000                set any warm        26.63 us/query
+features     integer interval             compile             70.92 us
+features     integer interval             matches             32.41 ns/query
+features     regular extglob              compile             13.78 us
+features     regular extglob              matches             25.50 ns/query
+features     Unicode folding              compile              6.05 us
+features     Unicode folding              matches             32.61 ns/query
+features     capture scratch              init                 1.67 us
+features     captures                     capture            513.28 ns/query
+features     walk 1000 files (half pruned) expand               0.42 ms
+run=7 variant=before
+single       src/main.zig                 one-shot             5.41 ns/path
+single       src/main.zig                 compiled             1.94 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.60 ns/path
+single       *.c                          compiled             3.02 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.74 ns/path
+single       **/*.rs                      compiled             3.02 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.70 ns/path
+single       docs/**                      compiled             3.05 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.73 ns/path
+single       drivers/*/Makefile           compiled             5.53 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.18 ns/path
+single       **/[Mm]akefile               compiled             4.84 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.12 ns/path
+single       src/**/test_*.zig            compiled             5.85 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            20.49 ns/path
+single       ?*.o                         compiled             6.55 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.78 ns/path
+single       *.[ch]                       compiled            10.52 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             4.85 ns/path
+single       lib/**/util*.h               compiled             5.00 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.56 ns/path
+single       **/kernel/**/*.c             compiled             8.24 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.61 ns/path
+single       net/*/*.c                    compiled             5.13 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.03 ns/path
+single       **/README*                   compiled            11.19 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.47 ns/path
+single       */*/*/*.json                 compiled             7.15 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.79 ns/path
+single       [a-m]*/**/*.go               compiled             7.79 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            148.63 ns
+compile      *.c                          compile            247.67 ns
+compile      **/*.rs                      compile            268.75 ns
+compile      docs/**                      compile            297.44 ns
+compile      drivers/*/Makefile           compile            508.73 ns
+compile      **/[Mm]akefile               compile            674.17 ns
+compile      src/**/test_*.zig            compile            462.50 ns
+compile      ?*.o                         compile            260.83 ns
+compile      *.[ch]                       compile            576.48 ns
+compile      lib/**/util*.h               compile            406.02 ns
+compile      **/kernel/**/*.c             compile            410.31 ns
+compile      net/*/*.c                    compile            347.98 ns
+compile      **/README*                   compile            296.23 ns
+compile      */*/*/*.json                 compile            371.38 ns
+compile      [a-m]*/**/*.go               compile            664.92 ns
+set          100 entries                  build                0.12 ms
+set          100 entries                  any (cold)         198.60 ns/path
+set          100 entries                  any                195.65 ns/path
+set          100 entries                  last               195.49 ns/path
+set          100 entries                  all                199.42 ns/path
+set          100 entries                  ancestors          424.81 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.80 ms
+set          1000 entries                 any (cold)         293.08 ns/path
+set          1000 entries                 any                245.39 ns/path
+set          1000 entries                 last               242.54 ns/path
+set          1000 entries                 all                244.05 ns/path
+set          1000 entries                 ancestors          487.75 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.51 ms
+set          10000 entries                any (cold)         682.23 ns/path
+set          10000 entries                any                282.66 ns/path
+set          10000 entries                last               280.91 ns/path
+set          10000 entries                all                285.52 ns/path
+set          10000 entries                ancestors          543.29 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.29 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        28.50 us/query
+long repeats ab-star x3000                set any warm        27.58 us/query
+features     integer interval             compile             69.97 us
+features     integer interval             matches             30.89 ns/query
+features     regular extglob              compile             13.56 us
+features     regular extglob              matches             25.03 ns/query
+features     Unicode folding              compile              5.84 us
+features     Unicode folding              matches             32.32 ns/query
+features     capture scratch              init                 2.00 us
+features     captures                     capture            472.74 ns/query
+features     walk 1000 files (half pruned) expand               0.37 ms
+run=7 variant=after
+single       src/main.zig                 one-shot             5.72 ns/path
+single       src/main.zig                 compiled             1.90 ns/path
+single       src/main.zig                 matched              0.00 paths
+single       *.c                          one-shot            14.80 ns/path
+single       *.c                          compiled             3.18 ns/path
+single       *.c                          matched           7707.00 paths
+single       **/*.rs                      one-shot            15.74 ns/path
+single       **/*.rs                      compiled             3.17 ns/path
+single       **/*.rs                      matched           7682.00 paths
+single       docs/**                      one-shot             4.90 ns/path
+single       docs/**                      compiled             2.92 ns/path
+single       docs/**                      matched           2965.00 paths
+single       drivers/*/Makefile           one-shot             5.97 ns/path
+single       drivers/*/Makefile           compiled             5.04 ns/path
+single       drivers/*/Makefile           matched              0.00 paths
+single       **/[Mm]akefile               one-shot            18.94 ns/path
+single       **/[Mm]akefile               compiled             4.58 ns/path
+single       **/[Mm]akefile               matched            150.00 paths
+single       src/**/test_*.zig            one-shot             6.37 ns/path
+single       src/**/test_*.zig            compiled             4.16 ns/path
+single       src/**/test_*.zig            matched             14.00 paths
+single       ?*.o                         one-shot            21.44 ns/path
+single       ?*.o                         compiled             6.15 ns/path
+single       ?*.o                         matched           7698.00 paths
+single       *.[ch]                       one-shot            23.42 ns/path
+single       *.[ch]                       compiled            17.42 ns/path
+single       *.[ch]                       matched          15429.00 paths
+single       lib/**/util*.h               one-shot             5.24 ns/path
+single       lib/**/util*.h               compiled             4.71 ns/path
+single       lib/**/util*.h               matched              6.00 paths
+single       **/kernel/**/*.c             one-shot            35.55 ns/path
+single       **/kernel/**/*.c             compiled             7.01 ns/path
+single       **/kernel/**/*.c             matched            827.00 paths
+single       net/*/*.c                    one-shot             4.83 ns/path
+single       net/*/*.c                    compiled             4.52 ns/path
+single       net/*/*.c                    matched             23.00 paths
+single       **/README*                   one-shot            13.17 ns/path
+single       **/README*                   compiled            11.62 ns/path
+single       **/README*                   matched           3245.00 paths
+single       */*/*/*.json                 one-shot            29.92 ns/path
+single       */*/*/*.json                 compiled             7.07 ns/path
+single       */*/*/*.json                 matched           1415.00 paths
+single       [a-m]*/**/*.go               one-shot            32.46 ns/path
+single       [a-m]*/**/*.go               compiled             7.12 ns/path
+single       [a-m]*/**/*.go               matched           4094.00 paths
+compile      src/main.zig                 compile            152.29 ns
+compile      *.c                          compile            263.90 ns
+compile      **/*.rs                      compile            285.06 ns
+compile      docs/**                      compile            318.25 ns
+compile      drivers/*/Makefile           compile            559.33 ns
+compile      **/[Mm]akefile               compile            676.42 ns
+compile      src/**/test_*.zig            compile            510.69 ns
+compile      ?*.o                         compile            284.83 ns
+compile      *.[ch]                       compile            597.96 ns
+compile      lib/**/util*.h               compile            453.33 ns
+compile      **/kernel/**/*.c             compile            455.85 ns
+compile      net/*/*.c                    compile            376.83 ns
+compile      **/README*                   compile            323.15 ns
+compile      */*/*/*.json                 compile            402.52 ns
+compile      [a-m]*/**/*.go               compile            684.58 ns
+set          100 entries                  build                0.12 ms
+set          100 entries                  any (cold)         205.52 ns/path
+set          100 entries                  any                201.14 ns/path
+set          100 entries                  last               194.66 ns/path
+set          100 entries                  all                198.85 ns/path
+set          100 entries                  ancestors          423.64 ns/path
+set          100 entries                  states             137.00 states
+set          100 entries                  clears               0.00 clears
+set          1000 entries                 build                0.78 ms
+set          1000 entries                 any (cold)         276.16 ns/path
+set          1000 entries                 any                268.12 ns/path
+set          1000 entries                 last               258.44 ns/path
+set          1000 entries                 all                261.19 ns/path
+set          1000 entries                 ancestors          493.41 ns/path
+set          1000 entries                 states             628.00 states
+set          1000 entries                 clears               0.00 clears
+set          10000 entries                build                7.66 ms
+set          10000 entries                any (cold)         704.51 ns/path
+set          10000 entries                any                299.03 ns/path
+set          10000 entries                last               297.72 ns/path
+set          10000 entries                all                304.52 ns/path
+set          10000 entries                ancestors          557.46 ns/path
+set          10000 entries                states            2929.00 states
+set          10000 entries                clears               0.00 clears
+adversarial  (*a)^32 b                    one-shot             0.33 us
+adversarial  (*a)^32 b                    compiled             0.00 us
+adversarial  *^64 b                       one-shot             0.04 us
+adversarial  *^64 b                       compiled             0.00 us
+adversarial  (**/)^32 z                   one-shot             0.33 us
+adversarial  (**/)^32 z                   compiled             0.00 us
+adversarial  (*/**/)^30 z                 one-shot             0.58 us
+adversarial  (*/**/)^30 z                 compiled             0.00 us
+adversarial  (**a)^20 b                   one-shot             0.25 us
+adversarial  (**a)^20 b                   compiled             0.00 us
+adversarial  {a,b}^20                     one-shot             1.04 us
+adversarial  {a,b}^20                     compiled             0.04 us
+long prefix  9000 units                   set any cold         0.21 us/query
+long prefix  9000 units                   set any warm         0.17 us/query
+long repeats ab-star x3000                set any cold        26.58 us/query
+long repeats ab-star x3000                set any warm        26.63 us/query
+features     integer interval             compile             71.25 us
+features     integer interval             matches             31.62 ns/query
+features     regular extglob              compile             14.09 us
+features     regular extglob              matches             25.66 ns/query
+features     Unicode folding              compile              6.03 us
+features     Unicode folding              matches             31.05 ns/query
+features     capture scratch              init                 1.50 us
+features     captures                     capture            510.27 ns/query
+features     walk 1000 files (half pruned) expand               0.36 ms

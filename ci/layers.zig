@@ -5,10 +5,12 @@ const family = @import("preflight_rules");
 pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "units and syntax", .patterns = &.{
         "src/fold.zig",
+        "src/composition.zig",
         "src/unicode.zig",
         "src/unit.zig",
         "src/syntax.zig",
     } },
+    .{ .name = "normalization", .patterns = &.{"src/normal.zig"} },
     .{ .name = "classes", .patterns = &.{
         "src/class.zig",
     } },

@@ -69,7 +69,7 @@ pub const Room = struct {
 /// pattern that fits `room`.
 pub inline fn match(pattern: []const u8, subject: []const u8, options: syntax.Options, room: Room) Outcome {
     const sx = options.syntax;
-    if (options.case == .unicode or sx.root_slash or sx.basename or sx.bracket_separator_literal or sx.extglob or sx.numeric_ranges or sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return .automaton;
+    if (sx.alternate_separator != null or options.normalization == .nfc or options.case == .unicode or sx.root_slash or sx.basename or sx.bracket_separator_literal or sx.extglob or sx.numeric_ranges or sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return .automaton;
     // A byte is a unit here.
     if (pattern.len > room.units) return .automaton;
     var roles: u8 = Role.star | Role.any;

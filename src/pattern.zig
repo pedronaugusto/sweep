@@ -78,12 +78,12 @@ pub const Pattern = struct {
     /// Compiles `pattern`, which is copied: nothing stays borrowed. Longer
     /// than `max_units` units is `error.PatternTooLong`.
     pub fn compile(gpa: Allocator, pattern: []const u8, options: syntax.Options) CompileError!Pattern {
-        if (pattern.len > max_units and unit.count(options.syntax.unit == .utf8 or options.case == .unicode, pattern) > max_units) {
+        if (pattern.len > max_units and unit.count(options.syntax.unit == .utf8 or options.case == .unicode or options.normalization == .nfc, pattern) > max_units) {
             if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
             return error.PatternTooLong;
         }
         const sx = options.syntax;
-        if (options.case == .sensitive and sx.unit == .byte and sx.leading_dot == .ordinary and !options.anywhere and !sx.basename and !sx.root_slash and helpers.literalPrefix(pattern, sx) == pattern.len)
+        if (sx.alternate_separator == null and options.normalization == .exact and options.case == .sensitive and sx.unit == .byte and sx.leading_dot == .ordinary and !options.anywhere and !sx.basename and !sx.root_slash and helpers.literalPrefix(pattern, sx) == pattern.len)
             return compileLiteral(gpa, pattern, options);
         const bounds: program_mod.Bounds = .of(pattern, options);
         var storage: match_mod.Storage = undefined;
@@ -169,16 +169,15 @@ pub const Pattern = struct {
     /// separator (exclusive) or at the end and that matches; null if none
     /// does. One pass. In text mode only the whole subject counts.
     pub fn ancestor(p: *const Pattern, subject: []const u8) ?usize {
-        const utf8 = p.reading.utf8;
         if (p.eager) |*e| {
             var state = e.start;
+            var reader = p.reading.iterator(subject);
             var at: usize = 0;
-            while (at < subject.len) {
-                const u = unit.decode(utf8, subject, at);
-                if (p.reading.isSeparator(u.code) and e.accepts(state)) return at;
-                state = e.next(state, u.code);
+            while (reader.next()) |cp| {
+                if (p.reading.isSeparator(cp) and e.accepts(state)) return at;
+                state = e.next(state, cp);
                 if (state == Eager.dead) return null;
-                at += u.len;
+                at = reader.at;
             }
             return if (e.accepts(state)) subject.len else null;
         }
@@ -190,15 +189,13 @@ pub const Pattern = struct {
     /// below which the subject is the rest alone. Exact for the pattern's
     /// language. In text mode the subject is `dir` then anything.
     pub fn leadsTo(p: *const Pattern, dir: []const u8) bool {
-        const utf8 = p.reading.utf8;
         const sep = p.reading.separator;
         if (p.eager) |*e| {
             var state = e.start;
-            var at: usize = 0;
-            while (at < dir.len and state != Eager.dead) {
-                const u = unit.decode(utf8, dir, at);
-                state = e.next(state, u.code);
-                at += u.len;
+            var reader = p.reading.iterator(dir);
+            while (reader.next()) |cp| {
+                state = e.next(state, cp);
+                if (state == Eager.dead) break;
             }
             if (dir.len > 0) if (sep) |s| if (state != Eager.dead) {
                 state = e.next(state, s);
@@ -342,12 +339,20 @@ pub const Eager = struct {
                 if (state == dead) return false;
             }
         } else {
-            var at: usize = 0;
-            while (at < subject.len) {
-                const u = unit.decode(true, subject, at);
-                state = e.next(state, u.code);
-                if (state == dead) return false;
-                at += u.len;
+            if (reading.alternate_separator != null or (reading.nfc and !unit.isAscii(subject))) {
+                var reader = reading.iterator(subject);
+                while (reader.next()) |cp| {
+                    state = e.next(state, cp);
+                    if (state == dead) return false;
+                }
+            } else {
+                var at: usize = 0;
+                while (at < subject.len) {
+                    const u = unit.decode(true, subject, at);
+                    state = e.next(state, u.code);
+                    if (state == dead) return false;
+                    at += u.len;
+                }
             }
         }
         return e.accepts(state);
@@ -479,12 +484,12 @@ noinline fn ancestorNfa(p: *const Pattern, subject: []const u8) ?usize {
     var stack: Stack = undefined;
     var sim = stack.sim(p);
     sim.reset();
+    var reader = p.reading.iterator(subject);
     var at: usize = 0;
-    while (at < subject.len) {
-        const u = unit.decode(p.reading.utf8, subject, at);
-        if (p.reading.isSeparator(u.code) and sim.accepting()) return at;
-        if (!sim.step(u.code)) return null;
-        at += u.len;
+    while (reader.next()) |cp| {
+        if (p.reading.isSeparator(cp) and sim.accepting()) return at;
+        if (!sim.step(cp)) return null;
+        at = reader.at;
     }
     return if (sim.accepting()) subject.len else null;
 }
@@ -493,12 +498,8 @@ noinline fn leadsToNfa(p: *const Pattern, dir: []const u8) bool {
     var stack: Stack = undefined;
     var sim = stack.sim(p);
     sim.reset();
-    var at: usize = 0;
-    while (at < dir.len) {
-        const u = unit.decode(p.reading.utf8, dir, at);
-        if (!sim.step(u.code)) return false;
-        at += u.len;
-    }
+    var reader = p.reading.iterator(dir);
+    while (reader.next()) |cp| if (!sim.step(cp)) return false;
     if (dir.len > 0) if (p.reading.separator) |s| if (!sim.step(s)) return false;
     var it = sim.threads();
     while (it.next()) |k| if (dfa.alive(p.live, k, sim.start)) return true;
@@ -522,7 +523,7 @@ fn baseOf(gpa: Allocator, pattern: []const u8, options: syntax.Options) Allocato
             if (pattern[i + 1] == sep) break;
             try out.append(gpa, pattern[i + 1]);
             i += 2;
-        } else if (c == sep) {
+        } else if (c == sep or (sx.alternate_separator != null and c == sx.alternate_separator.?)) {
             kept = out.items.len;
             try out.append(gpa, sep);
             i += 1;

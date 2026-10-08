@@ -1,7 +1,6 @@
 //! Ordered Pike simulation for captures. A per-thread cache owns the tagged
 //! program and scratch; ordinary matching carries no capture bookkeeping.
 const std = @import("std");
-const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
 const program_mod = @import("program.zig");
 const parse = @import("parse.zig");
@@ -117,17 +116,17 @@ pub const Cache = struct {
         @memset(c.temporary, unset);
         c.close(0, .sep, false, c.temporary);
         std.mem.swap(Kernel, &c.current, &c.next);
-        while (c.offset < subject.len) {
-            const u = unit.decode(c.reading.utf8, subject, c.offset);
+        var reader = c.reading.iterator(subject);
+        while (reader.next()) |cp| {
             const at_start = c.start;
-            c.start = c.reading.isSeparator(u.code);
-            c.offset += u.len;
+            c.start = c.reading.isSeparator(cp);
+            c.offset = reader.at;
             c.next.len = 0;
             @memset(c.seen, false);
             const p = c.program();
             for (c.current.ids[0..c.current.len]) |id| {
                 const k = id / 3;
-                if (!p.consumes(k, u.code, at_start)) continue;
+                if (!p.consumes(k, cp, at_start)) continue;
                 const node = p.nodes[k];
                 const history = c.offsets(c.current, id);
                 switch (node.op) {

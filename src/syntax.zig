@@ -7,6 +7,8 @@ pub const Syntax = struct {
     /// is a globstar. Null is text mode: `*` and `**` match any run, `?` and
     /// brackets match anything.
     separator: ?u8 = '/',
+    /// A second spelling of the separator, for native Windows path globs.
+    alternate_separator: ?u8 = null,
     /// What a run of two or more `*` means.
     globstar: Globstar = .component,
     /// `\x` matches `x` literally, inside and outside brackets. Off makes `\`
@@ -110,6 +112,8 @@ pub const Case = enum {
 /// What a pattern means, given with each call or compile.
 pub const Options = struct {
     syntax: Syntax = .git,
+    /// NFC composed scalar units for literals, classes and subjects. Exact by default.
+    normalization: enum { exact, nfc } = .exact,
     case: Case = .sensitive,
     /// A pattern holding no separator byte matches the last component at any
     /// depth, as gitignore matches a slash-free line: it is read as `**/`
@@ -146,6 +150,8 @@ pub const Diagnostics = struct {
         invalid_range,
         /// The pattern needs more room than the call has.
         too_long,
+        /// A normalized bracket member is not one composed scalar.
+        multi_scalar_member,
     };
 };
 

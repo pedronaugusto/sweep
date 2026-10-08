@@ -104,12 +104,17 @@ pub const Sim = struct {
     /// Runs `subject` from the start and returns whether it matched.
     pub fn run(sim: *Sim, subject: []const u8) bool {
         sim.reset();
-        const utf8 = sim.program.reading.utf8;
-        var at: usize = 0;
-        while (at < subject.len) {
-            const u = unit.decode(utf8, subject, at);
-            if (!sim.step(u.code)) return false;
-            at += u.len;
+        const reading = sim.program.reading;
+        if (reading.alternate_separator != null or (reading.nfc and !unit.isAscii(subject))) {
+            var reader = reading.iterator(subject);
+            while (reader.next()) |cp| if (!sim.step(cp)) return false;
+        } else {
+            var at: usize = 0;
+            while (at < subject.len) {
+                const u = unit.decode(reading.utf8, subject, at);
+                if (!sim.step(u.code)) return false;
+                at += u.len;
+            }
         }
         return sim.accepting();
     }

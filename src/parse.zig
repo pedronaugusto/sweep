@@ -2,6 +2,7 @@
 //! and extglobs use an explicit stack of open groups; brackets are read by git's own
 //! procedure and turned into a class by the dialect's case rule.
 const std = @import("std");
+const normal = @import("normal.zig");
 const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
 const program = @import("program.zig");
@@ -37,6 +38,7 @@ pub fn parse(b: *Builder, pattern: []const u8, options: syntax.Options, entry: E
 /// bracket included: then `anywhere` changes nothing.
 pub fn hasSeparator(pattern: []const u8, sx: syntax.Syntax) bool {
     const sep = sx.separator orelse return true;
+    if (sx.alternate_separator) |alt| if (std.mem.findScalar(u8, pattern, alt) != null) return true;
     if (!sx.bracket_separator_literal or sx.brackets == .none) return std.mem.findScalar(u8, pattern, sep) != null;
     var in_bracket = false;
     for (pattern) |byte| {
@@ -76,15 +78,14 @@ const Parser = struct {
 
     fn run(p: *Parser, entry: Entry) RunError!void {
         const sx = p.options.syntax;
-        return if (p.b.capture or sx.extglob or sx.numeric_ranges or sx.bracket_separator_literal)
-            p.items(true, entry)
-        else
-            p.items(false, entry);
+        const extended = p.b.capture or sx.extglob or sx.numeric_ranges or sx.bracket_separator_literal;
+        if (p.reading.nfc) return if (extended) p.items(true, true, entry) else p.items(false, true, entry);
+        return if (extended) p.items(true, false, entry) else p.items(false, false, entry);
     }
 
     // Ordinary dialects do not test numeric/extglob/capture rules per byte.
     // Both paths use the same parser and emit the same ordinary instructions.
-    fn items(p: *Parser, comptime extended: bool, entry: Entry) RunError!void {
+    fn items(p: *Parser, comptime extended: bool, comptime normalized: bool, entry: Entry) RunError!void {
         const sx = p.options.syntax;
         // A hidden leading dot makes every wildcard look one unit back.
         if (p.reading.leading_dot) p.b.uses_start = true;
@@ -100,6 +101,10 @@ const Parser = struct {
         while (i < pattern.len) {
             p.at = i;
             const c = pattern[i];
+            if (normalized and p.literalStart(i)) {
+                i = try p.normalLiterals(i);
+                continue;
+            }
             if (extended and sx.extglob and c == '!' and i + 1 < pattern.len and pattern[i + 1] == '(') return p.fail(.unsupported_extglob, i);
             const literal_bracket = if (extended and c == '[' and sx.brackets != .none and sx.bracket_separator_literal) separatorBracket(pattern, i, sx) else null;
             const interval = if (extended and c == '{' and sx.numeric_ranges) integer.read(pattern, i) catch return p.fail(.invalid_range, i) else null;
@@ -162,7 +167,7 @@ const Parser = struct {
                     i += u.len + @intFromBool(escaped);
                 }
             } else if (c == '[' and sx.brackets != .none) {
-                i = try p.bracket(i);
+                i = try p.bracket(normalized, i);
             } else if (interval) |range| {
                 try integer.compile(p.b, range);
                 p.last = .other;
@@ -208,8 +213,66 @@ const Parser = struct {
         if (id) |capture| _ = try p.b.emit(.save, @intCast(2 * capture + 1));
     }
 
+    fn literalStart(p: *const Parser, at: usize) bool {
+        const c = p.pattern[at];
+        const sx = p.options.syntax;
+        if (sx.escape and c == '\\') return at + 1 < p.pattern.len;
+        if (p.reading.isSeparator(c) or (sx.alternate_separator != null and c == sx.alternate_separator.?) or c == '*' or c == '?' or (c == '[' and sx.brackets != .none)) return false;
+        if (sx.braces and (c == '{' or c == '}' or (c == ',' and p.depth > 0))) return false;
+        if (sx.extglob and (c == ')' or c == '|' or (at + 1 < p.pattern.len and p.pattern[at + 1] == '(' and std.mem.findScalar(u8, "!+@", c) != null))) return false;
+        return true;
+    }
+    fn normalLiterals(p: *Parser, start: usize) RunError!usize {
+        var end = start;
+        while (end < p.pattern.len and p.literalStart(end)) {
+            const escaped = p.options.syntax.escape and p.pattern[end] == '\\';
+            const at = end + @intFromBool(escaped);
+            const u = p.decode(at);
+            if (p.reading.isSeparator(u.code)) break;
+            end = at + u.len;
+        }
+        if (end == start) {
+            _ = try p.b.emit(.sep, 1);
+            p.last = .sep;
+            return start + 2;
+        }
+        var it: normal.Iterator = .init(p.pattern[start..end], p.options.syntax.escape);
+        while (it.next()) |cp| try p.literal(cp, p.options.case == .ascii_git and p.pattern[start] == '\\');
+        return end;
+    }
+    fn member(p: *Parser, comptime normalized: bool, at: usize) RunError!struct { code: Code, len: usize } {
+        if (!normalized) {
+            const u = p.decode(at);
+            return .{ .code = u.code, .len = u.len };
+        }
+        var it: normal.Iterator = .init(p.pattern[at..], p.options.syntax.escape);
+        const cp = it.next().?;
+        const len = it.at;
+        // All outputs belonging to the same canonical segment are one member.
+        if (it.ordered) |o| {
+            var rest = o;
+            var starter = it.starter;
+            const last: u8 = 0;
+            while (rest.next()) |mark| {
+                const cc = normal.combining(mark);
+                if (starter) |st| if (last == 0 or last < cc) {
+                    if (normal.compose(st, mark)) |joined| {
+                        starter = joined;
+                        continue;
+                    }
+                };
+                return p.fail(.multi_scalar_member, at);
+            }
+        }
+        return .{ .code = cp, .len = len };
+    }
+
     fn decode(p: *const Parser, at: usize) unit.Unit {
-        return unit.decode(p.reading.utf8, p.pattern, at);
+        var u = unit.decode(p.reading.utf8, p.pattern, at);
+        if (p.options.syntax.alternate_separator) |alt| if (u.code == alt and p.reading.separator != null) {
+            u.code = p.reading.separator.?;
+        };
+        return u;
     }
 
     fn literal(p: *Parser, code: Code, escaped: bool) RunError!void {
@@ -288,7 +351,7 @@ const Parser = struct {
     }
 
     /// Reads the bracket at `i` and returns where parsing goes on.
-    fn bracket(p: *Parser, i: usize) RunError!usize {
+    fn bracket(p: *Parser, comptime normalized: bool, i: usize) RunError!usize {
         const sx = p.options.syntax;
         const pattern = p.pattern;
         const b = p.b;
@@ -307,17 +370,17 @@ const Parser = struct {
             if (sx.escape and c == '\\') {
                 at += 1;
                 if (at >= pattern.len) return p.unclosed(i);
-                const u = p.decode(at);
+                const u = try p.member(normalized, at);
                 filler.single(u.code);
                 current = u.code;
                 step = u.len;
             } else if (c == '-' and prev != 0 and at + 1 < pattern.len and pattern[at + 1] != ']') {
                 at += 1;
-                var high = p.decode(at);
+                var high = try p.member(normalized, at);
                 if (sx.escape and pattern[at] == '\\') {
                     at += 1;
                     if (at >= pattern.len) return p.unclosed(i);
-                    high = p.decode(at);
+                    high = try p.member(normalized, at);
                 }
                 filler.range(prev, high.code);
                 current = 0;
@@ -337,7 +400,7 @@ const Parser = struct {
                     current = 0;
                 }
             } else {
-                const u = p.decode(at);
+                const u = try p.member(normalized, at);
                 filler.single(u.code);
                 current = u.code;
                 step = u.len;

@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) !void {
             .tests = test_step,
             .portable_tests = true,
             .bench = .{
-                .programs = &.{.{ .name = "bench", .source = "bench/main.zig" }},
+                .programs = &.{ .{ .name = "bench", .source = "bench/main.zig" }, .{ .name = "normalization", .source = "bench/normalization.zig" } },
                 .imports = benchImports,
                 .target = target,
                 .optimize = optimize,
@@ -94,5 +94,10 @@ pub fn build(b: *std.Build) !void {
 /// time the Debug module.
 fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) []const std.Build.Module.Import {
     const sweep = b.createModule(.{ .root_source_file = b.path("src/sweep.zig"), .target = target, .optimize = optimize });
+    // The root already requests this lazy test dependency. If configure
+    // needs another pass, the root returns LazyDependencyNeeded below.
+    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize })) |shakedown| {
+        return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
+    } else |_| {}
     return b.allocator.dupe(std.Build.Module.Import, &.{.{ .name = "sweep", .module = sweep }}) catch @panic("OOM");
 }

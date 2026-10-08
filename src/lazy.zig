@@ -338,13 +338,24 @@ const Run = struct {
 
     /// Consumes `bytes[0..to]`; false once nothing can match.
     fn feed(r: *Run, bytes: []const u8, to: usize) bool {
-        const utf8 = r.automaton.reading.utf8;
+        const reading = r.automaton.reading;
+        if (reading.byte_input) {
+            for (bytes[0..to]) |byte| if (!r.consume(byte)) return false;
+            return true;
+        }
+        if (reading.alternate_separator != null or (reading.nfc and !unit.isAscii(bytes[0..to]))) return r.feedComposed(bytes[0..to]);
         var at: usize = 0;
         while (at < to) {
-            const u = unit.decode(utf8, bytes, at);
+            const u = unit.decode(reading.utf8, bytes, at);
             if (!r.consume(u.code)) return false;
             at += u.len;
         }
+        return true;
+    }
+
+    noinline fn feedComposed(r: *Run, bytes: []const u8) bool {
+        var reader = r.automaton.reading.iterator(bytes);
+        while (reader.next()) |cp| if (!r.consume(cp)) return false;
         return true;
     }
 

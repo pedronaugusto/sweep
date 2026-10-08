@@ -92,3 +92,9 @@ test "overlong forms and surrogates are ill-formed" {
     try std.testing.expectEqual(ill_formed + 0xed, decode(true, "\xed\xa0\x80", 0).code);
     try std.testing.expectEqual(ill_formed + 0xf4, decode(true, "\xf4\x90\x80\x80", 0).code);
 }
+
+/// Whether a string needs no scalar decoding or composition.
+pub fn isAscii(bytes: []const u8) bool {
+    for (bytes) |b| if (b >= 0x80) return false;
+    return true;
+}

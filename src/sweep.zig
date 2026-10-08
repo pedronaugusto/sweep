@@ -53,6 +53,10 @@ pub const Paths = @import("walk.zig").Paths;
 /// Expands a matcher against a directory.
 pub const expand = @import("walk.zig").expand;
 
+/// Allocation-free NFC scalar iterator. `at` retains original byte boundaries;
+/// invalid UTF-8 bytes use codes above Unicode scalars and remain distinct.
+pub const Composed = @import("normal.zig").Iterator;
+
 /// Unicode 18 default simple case folding of one scalar.
 /// This is the same mapping used by `Case.unicode`: no normalization,
 /// expansion or Turkic mappings. Codes outside Unicode stay unchanged,

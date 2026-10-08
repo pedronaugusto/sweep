@@ -8,6 +8,7 @@
 //! Contexts make braces exact: a `**` or a leading `.` reached through an
 //! alternative means what it would mean written out in full.
 const std = @import("std");
+const normal = @import("normal.zig");
 const unit = @import("unit.zig");
 const unicode = @import("unicode.zig");
 const syntax = @import("syntax.zig");
@@ -74,6 +75,8 @@ pub const Context = enum(u2) {
 pub const Reading = struct {
     /// UTF-8 units rather than bytes.
     utf8: bool,
+    nfc: bool = false,
+    alternate_separator: ?u8 = null,
     /// The separator's unit code, or null in text mode.
     separator: ?unit.Code,
     /// Subject units are case folded before they are compared.
@@ -82,21 +85,54 @@ pub const Reading = struct {
     unicode: bool,
     /// A leading `.` is hidden from wildcards.
     leading_dot: bool,
+    /// Byte reader without separator spelling conversion.
+    byte_input: bool = false,
 
     pub fn of(options: syntax.Options) Reading {
-        const utf8 = options.syntax.unit == .utf8 or options.case == .unicode;
+        const utf8 = options.syntax.unit == .utf8 or options.case == .unicode or options.normalization == .nfc;
         return .{
             .utf8 = utf8,
+            .nfc = options.normalization == .nfc,
             .separator = if (options.syntax.separator) |s| unit.separatorCode(utf8, s) else null,
+            .alternate_separator = options.syntax.alternate_separator,
             .fold = options.case != .sensitive,
             .unicode = options.case == .unicode,
             .leading_dot = options.syntax.leading_dot == .explicit,
+            .byte_input = !utf8 and options.syntax.alternate_separator == null,
         };
     }
 
     pub fn eql(a: Reading, b: Reading) bool {
-        return a.utf8 == b.utf8 and a.separator == b.separator and a.fold == b.fold and a.unicode == b.unicode and a.leading_dot == b.leading_dot;
+        return a.nfc == b.nfc and a.utf8 == b.utf8 and a.separator == b.separator and a.alternate_separator == b.alternate_separator and a.fold == b.fold and a.unicode == b.unicode and a.leading_dot == b.leading_dot;
     }
+
+    /// Iterate the subject without allocating or changing its spelling.
+    pub fn iterator(r: Reading, bytes: []const u8) Iterator {
+        return .{ .bytes = bytes, .utf8 = r.utf8, .nfc = r.nfc, .alternate = r.alternate_separator, .separator = r.separator, .normal = if (r.nfc) .init(bytes, false) else undefined };
+    }
+    pub const Iterator = struct {
+        bytes: []const u8,
+        utf8: bool,
+        nfc: bool,
+        alternate: ?u8,
+        separator: ?unit.Code,
+        normal: normal.Iterator,
+        at: usize = 0,
+        pub fn next(it: *Iterator) ?unit.Code {
+            if (it.nfc) {
+                const cp = it.normal.next() orelse return null;
+                it.at = it.normal.at;
+                return it.code(cp);
+            }
+            if (it.at == it.bytes.len) return null;
+            const u = unit.decode(it.utf8, it.bytes, it.at);
+            it.at += u.len;
+            return it.code(u.code);
+        }
+        fn code(it: *const Iterator, cp: unit.Code) unit.Code {
+            return if (it.alternate != null and cp == it.alternate.? and it.separator != null) it.separator.? else cp;
+        }
+    };
 
     /// The code a subject unit is compared by.
     pub fn canonical(r: Reading, code: unit.Code) unit.Code {

@@ -5,8 +5,9 @@ dialects beside it, for one pattern or many at once. Matching time is linear
 in the subject for every pattern, by construction: there is no backtracking and
 no recursion anywhere, the parser included.
 
-The filesystem normalization seam is work in progress; `foldCase` shares the
-Unicode simple-fold mapping without changing glob scalar semantics.
+Work in progress toward the public cut. Optional `normalization = .nfc`
+matches composed scalars in patterns and names; defaults remain exact.
+`foldCase` and `Composed` share Unicode data with filesystem callers.
 
 ## Install
 

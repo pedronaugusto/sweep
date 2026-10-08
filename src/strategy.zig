@@ -98,7 +98,7 @@ fn bytesExact(p: Program) bool {
 /// Recognises a strategy in a one-entry program (ending in its accept).
 pub fn recognise(p: Program) Shape {
     var shape: Shape = .{};
-    if (p.reading.unicode) return .{ .tail_start = p.nodes.len - 1 };
+    if (p.reading.alternate_separator != null or p.reading.nfc or p.reading.unicode) return .{ .tail_start = p.nodes.len - 1 };
     const nodes = p.nodes[0 .. p.nodes.len - 1];
     shape.head = literalRun(nodes, 0);
     shape.tail_start = tailRun(nodes, shape.head);

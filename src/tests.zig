@@ -1,4 +1,5 @@
 test {
+    _ = @import("testing/normalize_test.zig");
     _ = @import("testing/fold_test.zig");
     _ = @import("unit.zig");
     _ = @import("testing/complete_test.zig");

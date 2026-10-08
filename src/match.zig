@@ -73,7 +73,7 @@ noinline fn general(pattern: []const u8, subject: []const u8, options: syntax.Op
 /// Whether a pattern of more than `inline_units` bytes is more than that many
 /// units, filling the diagnostic when it is.
 noinline fn tooLong(pattern: []const u8, options: syntax.Options) bool {
-    if (unit.count(options.syntax.unit == .utf8 or options.case == .unicode, pattern) <= inline_units) return false;
+    if (unit.count(options.syntax.unit == .utf8 or options.case == .unicode or options.normalization == .nfc, pattern) <= inline_units) return false;
     if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
     return true;
 }
