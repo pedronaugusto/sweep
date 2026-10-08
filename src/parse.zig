@@ -76,6 +76,16 @@ const Parser = struct {
 
     fn run(p: *Parser, entry: Entry) RunError!void {
         const sx = p.options.syntax;
+        return if (p.b.capture or sx.extglob or sx.numeric_ranges or sx.bracket_separator_literal)
+            p.items(true, entry)
+        else
+            p.items(false, entry);
+    }
+
+    // Ordinary dialects do not test numeric/extglob/capture rules per byte.
+    // Both paths use the same parser and emit the same ordinary instructions.
+    fn items(p: *Parser, comptime extended: bool, entry: Entry) RunError!void {
+        const sx = p.options.syntax;
         // A hidden leading dot makes every wildcard look one unit back.
         if (p.reading.leading_dot) p.b.uses_start = true;
         if ((p.options.anywhere or sx.basename) and !hasSeparator(p.pattern, sx)) {
@@ -90,12 +100,12 @@ const Parser = struct {
         while (i < pattern.len) {
             p.at = i;
             const c = pattern[i];
-            if (sx.extglob and c == '!' and i + 1 < pattern.len and pattern[i + 1] == '(') return p.fail(.unsupported_extglob, i);
-            const literal_bracket = if (c == '[' and sx.brackets != .none and sx.bracket_separator_literal) separatorBracket(pattern, i, sx) else null;
-            const interval = if (c == '{' and sx.numeric_ranges) integer.read(pattern, i) catch return p.fail(.invalid_range, i) else null;
-            const group = ((sx.braces and c == '{') or interval != null) or (sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null);
-            const capture = if (group or c == '*' or c == '?' or (c == '[' and sx.brackets != .none and literal_bracket == null)) try p.startCapture() else null;
-            if (sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null) {
+            if (extended and sx.extglob and c == '!' and i + 1 < pattern.len and pattern[i + 1] == '(') return p.fail(.unsupported_extglob, i);
+            const literal_bracket = if (extended and c == '[' and sx.brackets != .none and sx.bracket_separator_literal) separatorBracket(pattern, i, sx) else null;
+            const interval = if (extended and c == '{' and sx.numeric_ranges) integer.read(pattern, i) catch return p.fail(.invalid_range, i) else null;
+            const group = ((sx.braces and c == '{') or interval != null) or (extended and sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null);
+            const capture = if (extended and (group or c == '*' or c == '?' or (c == '[' and sx.brackets != .none and literal_bracket == null))) try p.startCapture() else null;
+            if (extended and sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null) {
                 const bypass = try p.b.emit(.split, 0);
                 try p.open(i);
                 const frame = &p.b.frames[p.depth - 1];
@@ -109,13 +119,16 @@ const Parser = struct {
                     else => unreachable,
                 };
                 i += 2;
-            } else if (sx.extglob and c == '|' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
+            } else if (extended and sx.extglob and c == '|' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
                 try p.alternative();
                 i += 1;
-            } else if (sx.extglob and c == ')' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
+            } else if (extended and sx.extglob and c == ')' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
                 const frame = p.b.frames[p.depth - 1];
                 try p.close();
-                if (frame.kind == .zero_more or frame.kind == .one_more) _ = try p.b.emit(.split, @intCast(frame.head + 1));
+                if (frame.kind == .zero_more or frame.kind == .one_more) {
+                    _ = try p.b.emit(.split, @intCast(frame.head + 1));
+                    p.b.cyclic = true;
+                }
                 if (frame.kind == .optional or frame.kind == .zero_more) {
                     p.b.nodes[frame.head].arg = @intCast(p.b.node_len);
                 } else p.b.nodes[frame.head] = .{ .op = .jump, .arg = @intCast(frame.head + 1) };

@@ -88,7 +88,7 @@ pub const Classes = struct {
         defer gpa.free(ids);
         @memset(ids, 0);
         var classes: u16 = 1;
-        var refiner: Refiner = try .init(gpa, elements);
+        var refiner: Refiner = try .init(gpa, reps, p.reading);
         defer refiner.deinit(gpa);
         // Every distinction a node makes.
         classes = refiner.split(ids, classes, reps, p, .separator, 0);
@@ -121,13 +121,19 @@ const Predicate = enum { separator, dot, literal, class };
 /// Partition refinement: each predicate splits every class in two.
 const Refiner = struct {
     map: []u16,
+    canonical: []Code,
 
-    fn init(gpa: Allocator, elements: usize) Allocator.Error!Refiner {
-        return .{ .map = try gpa.alloc(u16, 2 * elements) };
+    fn init(gpa: Allocator, reps: []const Code, reading: program_mod.Reading) Allocator.Error!Refiner {
+        const map = try gpa.alloc(u16, 2 * reps.len);
+        errdefer gpa.free(map);
+        const canonical = try gpa.alloc(Code, reps.len);
+        for (canonical, reps) |*out, raw| out.* = reading.canonical(raw);
+        return .{ .map = map, .canonical = canonical };
     }
 
     fn deinit(r: *Refiner, gpa: Allocator) void {
         gpa.free(r.map);
+        gpa.free(r.canonical);
         r.* = undefined;
     }
 
@@ -135,8 +141,8 @@ const Refiner = struct {
         const none = std.math.maxInt(u16);
         @memset(r.map[0 .. 2 * @as(usize, classes)], none);
         var next: u16 = 0;
-        for (ids, reps) |*id, code| {
-            const in = holds(p, predicate, k, code);
+        for (ids, reps, r.canonical) |*id, code, canonical| {
+            const in = holds(p, predicate, k, code, canonical);
             const slot = &r.map[2 * @as(usize, id.*) + @intFromBool(in)];
             if (slot.* == none) {
                 slot.* = next;
@@ -147,13 +153,13 @@ const Refiner = struct {
         return next;
     }
 
-    fn holds(p: Program, predicate: Predicate, k: usize, code: Code) bool {
+    fn holds(p: Program, predicate: Predicate, k: usize, code: Code, canonical: Code) bool {
         const r = p.reading;
         return switch (predicate) {
             .separator => r.isSeparator(code),
             .dot => code == '.',
-            .literal => r.canonical(code) == p.nodes[k].arg,
-            .class => p.classes[p.nodes[k].arg].contains(p.ranges, r.canonical(code)),
+            .literal => canonical == p.nodes[k].arg,
+            .class => p.classes[p.nodes[k].arg].contains(p.ranges, canonical),
         };
     }
 };
@@ -161,7 +167,7 @@ const Refiner = struct {
 /// Whether each kernel node can still reach an accept: bit 0 at a position
 /// that is not a component start, bit 1 at one.
 pub fn liveness(gpa: Allocator, p: Program) Allocator.Error![]u2 {
-    for (p.nodes, 0..) |node, i| if ((node.op == .jump or node.op == .split) and node.arg <= i) return cyclicLiveness(gpa, p);
+    if (p.cyclic) return cyclicLiveness(gpa, p);
     const n = p.nodes.len;
     const kernel = try gpa.alloc(u2, n);
     errdefer gpa.free(kernel);

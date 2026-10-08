@@ -62,6 +62,15 @@ fn family(comptime piece: []const u8, comptime times: usize, comptime tail: []co
     try std.testing.expectEqual(want, try owned.run(subject));
 }
 
+test "forward epsilon closure leaves cycle scratch untouched" {
+    var owned: Owned = try .init("{src,lib}/**/*.[ch]", .{ .syntax = .glob });
+    defer owned.deinit();
+    const sentinel: u64 = 0x123456789abcdef0;
+    for (owned.seen) |bits| @memset(bits, sentinel);
+    try std.testing.expect(try owned.run("src/a/main.c"));
+    for (owned.seen) |bits| for (bits) |word| try std.testing.expectEqual(sentinel, word);
+}
+
 test "up to 32 stars before an absent literal" {
     const a4096 = repeat("a", 4096);
     inline for (.{ 1, 8, 32 }) |k| {

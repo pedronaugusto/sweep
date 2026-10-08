@@ -52,6 +52,8 @@ pub const Pattern = struct {
     reading: program_mod.Reading,
     /// Private: whether the automaton reads the component-start bit.
     uses_start: bool,
+    /// Private: whether closure needs visited-context tracking.
+    cyclic: bool = false,
     /// Private: which kernel threads can still match.
     live: []u2,
     /// Private: a literal strategy that decides the pattern.
@@ -108,6 +110,7 @@ pub const Pattern = struct {
             .ranges = &.{},
             .reading = .of(options),
             .uses_start = b.uses_start,
+            .cyclic = b.cyclic,
             .live = &.{},
             .strategy = null,
             .head = &.{},
@@ -235,7 +238,7 @@ pub const Pattern = struct {
     }
 
     fn program(p: *const Pattern) Program {
-        return .{ .nodes = p.nodes, .classes = p.classes, .ranges = p.ranges, .reading = p.reading, .uses_start = p.uses_start };
+        return .{ .nodes = p.nodes, .classes = p.classes, .ranges = p.ranges, .reading = p.reading, .uses_start = p.uses_start, .cyclic = p.cyclic };
     }
 
     fn prefilter(p: *const Pattern, subject: []const u8) bool {

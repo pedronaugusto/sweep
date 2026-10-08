@@ -12,6 +12,7 @@ git+https://github.com/pedronaugusto/sweep`, then obtain the `sweep` module thro
 `b.dependency` and add it to your executable's imports. sweep has no dependencies
 at runtime. Its matching and capture APIs build for every target,
 wasm32-freestanding included. Optional filesystem expansion uses `std.Io`.
+See [the design](docs/design.md) for ownership, layers and matching bounds.
 
 ## Usage
 

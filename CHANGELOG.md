@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Ordinary epsilon closure skips extglob cycle tracking, and NFA steps fold a unit once across all active threads.
+- DFA construction reuses canonical unit representatives; ordinary parsing skips disabled numeric, extglob and capture work.
+- Direct matching consumes standalone component stars before general execution and scans each remaining component's star segments with one local bound.
 - Plain compiled byte patterns reuse validated direct execution; fixed-width star tails and basename prefixes avoid DFA construction.
 - Small compilations use stack construction, and Sets hash component prefixes, including patterns longer than `Pattern.max_units`.
 - One-shot literal rejection skips dialect setup when the first byte decides the result.

@@ -118,6 +118,8 @@ pub const Program = struct {
     /// Whether any node reads the component-start bit: a globstar's
     /// asserted separator, or a hidden leading dot.
     uses_start: bool,
+    /// Repetition has a backward epsilon edge.
+    cyclic: bool = false,
 
     /// States the step bound counts: every node in every context.
     pub fn states(p: Program) usize {
@@ -127,16 +129,22 @@ pub const Program = struct {
     /// Whether node `k`, in the kernel, consumes `code` at a position whose
     /// previous unit is a separator (or that is the start) when `start`.
     pub fn consumes(p: Program, k: usize, code: unit.Code, start: bool) bool {
+        return p.consumesCanonical(k, code, p.reading.canonical(code), start);
+    }
+
+    /// Tests a unit folded once for all threads. Raw codes retain separator
+    /// and leading-dot meaning even when their canonical code aliases one.
+    pub fn consumesCanonical(p: Program, k: usize, code: unit.Code, canonical: unit.Code, start: bool) bool {
         const node = p.nodes[k];
         const r = p.reading;
         const hidden = r.leading_dot and start and code == '.';
         return switch (node.op) {
-            .lit => r.canonical(code) == node.arg,
+            .lit => canonical == node.arg,
             .dot => code == '.',
             .dot_plain => code == '.' and !hidden,
             .sep => r.isSeparator(code),
             .any => !r.isSeparator(code) and !hidden,
-            .class => !r.isSeparator(code) and !hidden and p.classes[node.arg].contains(p.ranges, r.canonical(code)),
+            .class => !r.isSeparator(code) and !hidden and p.classes[node.arg].contains(p.ranges, canonical),
             .star => (node.arg == 1 or !r.isSeparator(code)) and !hidden,
             .gstar => !hidden,
             .split, .jump, .save, .accept => false,
@@ -171,6 +179,8 @@ pub const Builder = struct {
     class_len: usize = 0,
     range_len: usize = 0,
     uses_start: bool = false,
+    /// A repeated group emitted a backward epsilon edge.
+    cyclic: bool = false,
     /// Emit capture tags only for a capture-cache build.
     capture: bool = false,
     capture_count: u32 = 0,
@@ -191,6 +201,7 @@ pub const Builder = struct {
             .ranges = b.ranges[0..b.range_len],
             .reading = reading,
             .uses_start = b.uses_start,
+            .cyclic = b.cyclic,
         };
     }
 };

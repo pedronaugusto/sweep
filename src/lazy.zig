@@ -19,6 +19,7 @@ pub const Automaton = struct {
     ranges: []program_mod.Range = &.{},
     reading: program_mod.Reading,
     uses_start: bool = false,
+    cyclic: bool = false,
     live: []u2 = &.{},
     units: ?dfa.Classes = null,
 
@@ -63,6 +64,7 @@ pub const Automaton = struct {
         a.classes = try gpa.dupe(program_mod.Class, b.classes[0..b.class_len]);
         a.ranges = try gpa.dupe(program_mod.Range, b.ranges[0..b.range_len]);
         a.uses_start = b.uses_start;
+        a.cyclic = b.cyclic;
         a.live = try dfa.liveness(gpa, a.program());
         a.units = try .init(gpa, a.program());
         return a;
@@ -78,7 +80,7 @@ pub const Automaton = struct {
     }
 
     pub fn program(a: *const Automaton) Program {
-        return .{ .nodes = a.nodes, .classes = a.classes, .ranges = a.ranges, .reading = a.reading, .uses_start = a.uses_start };
+        return .{ .nodes = a.nodes, .classes = a.classes, .ranges = a.ranges, .reading = a.reading, .uses_start = a.uses_start, .cyclic = a.cyclic };
     }
 
     pub fn isEmpty(a: *const Automaton) bool {

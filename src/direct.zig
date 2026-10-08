@@ -179,20 +179,31 @@ inline fn read(comptime fold: bool, comptime separated: bool, pattern: []const u
 
 inline fn readFrom(comptime fold: bool, comptime separated: bool, pattern: []const u8, subject: []const u8, roles: u8, start: usize) Outcome {
     var i = start;
-    while (i < pattern.len) : (i += 1) {
+    var at = start;
+    while (i < pattern.len) {
         const c = pattern[i];
-        if (Role.of[c] & (roles & ~Role.separator) != 0) return run(fold, separated, pattern, subject, roles, i);
-        if (i == subject.len or !same(fold, c, subject[i])) return settle(pattern, i, roles);
+        // A whole-component star needs only its next separator. Consume it
+        // here without setting up segment searches or globstar retry state.
+        if (separated and c == '*' and i + 1 < pattern.len and pattern[i + 1] == '/') {
+            const slash = Slashes.first(subject, at) orelse return settle(pattern, i + 2, roles);
+            i += 2;
+            at = slash + 1;
+            continue;
+        }
+        if (Role.of[c] & (roles & ~Role.separator) != 0) return run(fold, separated, pattern, subject, roles, i, at);
+        if (at == subject.len or !same(fold, c, subject[at])) return settle(pattern, i, roles);
+        i += 1;
+        at += 1;
     }
-    return if (i == subject.len) .yes else .no;
+    return if (at == subject.len) .yes else .no;
 }
 
 /// No retry point.
 const none = std.math.maxInt(usize);
 
-/// The reader, from `start` in both the pattern and the subject.
-noinline fn run(comptime fold: bool, comptime separated: bool, pattern: []const u8, subject: []const u8, roles: u8, start: usize) Outcome {
-    var r: Reader(fold, separated) = .{ .pattern = pattern, .subject = subject, .roles = roles, .p = start, .s = start, .seen = start };
+/// The reader, from the supplied pattern and subject offsets.
+noinline fn run(comptime fold: bool, comptime separated: bool, pattern: []const u8, subject: []const u8, roles: u8, start: usize, subject_start: usize) Outcome {
+    var r: Reader(fold, separated) = .{ .pattern = pattern, .subject = subject, .roles = roles, .p = start, .s = subject_start, .seen = start };
     while (true) {
         const step: Step = step: {
             if (r.p == pattern.len) break :step if (r.s == subject.len) .{ .done = .yes } else .fail;
@@ -240,7 +251,6 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
         deep: Slashes = undefined,
         /// The pattern before `seen` has been read and is this executor's.
         seen: usize,
-        component_end: usize = none,
 
         const Self = @This();
 
@@ -267,7 +277,9 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
             return .next;
         }
 
-        /// Reads the run of `*` at `p` and the segment after it.
+        /// Reads every star segment remaining in this component. The end
+        /// is local to this scan: reused between segments, never carried
+        /// through separators or stored in the reader's retry state.
         inline fn stars(r: *Self) Step {
             const pattern = r.pattern;
             const p = r.p;
@@ -278,34 +290,28 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
             {
                 return r.globstar(q);
             }
-            // The star never takes a separator: it ends where the
-            // subject's component does.
-            const end = if (separated) r.componentEnd() else r.subject.len;
-            if (q == pattern.len or (separated and pattern[q] == '/')) {
-                // Nothing follows in the component: the star takes the rest.
-                r.p = q;
-                r.s = end;
-                return .next;
+            const end = if (separated) Slashes.first(r.subject, r.s) orelse r.subject.len else r.subject.len;
+            while (true) {
+                if (q == pattern.len or (separated and pattern[q] == '/')) {
+                    r.p = q;
+                    r.s = end;
+                    return .next;
+                }
+                const segment = Segment.read(separated, pattern, q, r.roles) orelse return .{ .done = .automaton };
+                r.seen = @max(r.seen, segment.end);
+                if (end - r.s < segment.units) return .fail;
+                const at = if (segment.star)
+                    r.first(segment, end) orelse return .fail
+                else if (r.unitsAt(segment, end - segment.units))
+                    end - segment.units
+                else
+                    return .fail;
+                r.p = segment.end;
+                r.s = at + segment.units;
+                if (!segment.star) return .next;
+                q = r.p + 1;
+                while (q < pattern.len and pattern[q] == '*') q += 1;
             }
-            const segment = Segment.read(separated, pattern, q, r.roles) orelse return .{ .done = .automaton };
-            r.seen = @max(r.seen, segment.end);
-            if (end - r.s < segment.units) return .fail;
-            const at = if (segment.star)
-                r.first(segment, end) orelse return .fail
-            else if (r.unitsAt(segment, end - segment.units))
-                end - segment.units
-            else
-                return .fail;
-            r.p = segment.end;
-            r.s = at + segment.units;
-            return .next;
-        }
-
-        fn componentEnd(r: *Self) usize {
-            if (r.component_end == none or r.s > r.component_end) {
-                r.component_end = Slashes.first(r.subject, r.s) orelse r.subject.len;
-            }
-            return r.component_end;
         }
 
         /// The first place at or after `s` where `segment` matches, ending
@@ -376,7 +382,6 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
                 if (!literal or (start < r.subject.len and same(fold, lead, r.subject[start]))) {
                     r.p = r.deep_p;
                     r.s = start;
-                    r.component_end = none;
                     return true;
                 }
             }

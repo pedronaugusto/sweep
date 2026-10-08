@@ -27,6 +27,7 @@ pub const Cache = struct {
     ranges: []program_mod.Range,
     reading: program_mod.Reading,
     uses_start: bool,
+    cyclic: bool = false,
     capture_count: usize,
     node_count: usize,
     class_count: usize,
@@ -77,7 +78,7 @@ pub const Cache = struct {
         const temporary = try gpa.alloc(usize, slots);
         errdefer gpa.free(temporary);
         const seen = try gpa.alloc(bool, states);
-        return .{ .gpa = gpa, .source = source, .nodes = nodes, .classes = classes, .ranges = ranges, .reading = .of(options), .uses_start = b.uses_start, .capture_count = b.capture_count, .node_count = b.node_len, .class_count = b.class_len, .range_count = b.range_len, .current = .{ .ids = cur, .histories = history }, .next = .{ .ids = next, .histories = other }, .frames = stack, .pending = pending, .temporary = temporary, .seen = seen };
+        return .{ .gpa = gpa, .source = source, .nodes = nodes, .classes = classes, .ranges = ranges, .reading = .of(options), .uses_start = b.uses_start, .cyclic = b.cyclic, .capture_count = b.capture_count, .node_count = b.node_len, .class_count = b.class_len, .range_count = b.range_len, .current = .{ .ids = cur, .histories = history }, .next = .{ .ids = next, .histories = other }, .frames = stack, .pending = pending, .temporary = temporary, .seen = seen };
     }
 
     /// Frees the tagged program and scratch.
@@ -150,7 +151,7 @@ pub const Cache = struct {
     }
 
     fn program(c: *const Cache) program_mod.Program {
-        return .{ .nodes = c.nodes[0..c.node_count], .classes = c.classes[0..c.class_count], .ranges = c.ranges[0..c.range_count], .reading = c.reading, .uses_start = c.uses_start };
+        return .{ .nodes = c.nodes[0..c.node_count], .classes = c.classes[0..c.class_count], .ranges = c.ranges[0..c.range_count], .reading = c.reading, .uses_start = c.uses_start, .cyclic = c.cyclic };
     }
     fn offsets(c: *const Cache, kernel: Kernel, id: usize) []usize {
         const slots = c.capture_count * 2;
