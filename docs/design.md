@@ -37,8 +37,8 @@ runtime closure.
 `Pattern` owns its compiled program and copied source. Its ordinary queries use
 local scratch, so threads share no mutable matching state. `Set` owns immutable
 strategies and programs, partitioned by subject reading (units, normalization,
-case, separators and leading-dot policy). Entries share one primary separator;
-an incompatible separator returns `SeparatorMismatch`. Each concurrent query
+case, separators and leading-dot policy). Entries share primary and alternate separators;
+an incompatible boundary grammar returns `SeparatorMismatch`. Each concurrent query
 owns a separate `Set.Cache`, which must not outlive its Set. Insertion order
 sets entry indices: `first` takes the lowest, `last` the highest, and `all`
 returns ascending indices. Proper ancestors count as directories; `dir_only`

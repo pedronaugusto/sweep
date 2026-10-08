@@ -161,3 +161,57 @@ test "NFC allocation failures leave no partial owner" {
     var no_resize: shakedown.alloc.NoResize = .init(t.allocator);
     try t.checkAllAllocationFailures(no_resize.allocator(), allocationCase, .{});
 }
+
+test "alternate separators stop ancestor prefixes at original byte offsets" {
+    for ([_]@TypeOf(options.normalization){ .exact, .nfc }) |mode| {
+        const opts: sweep.Options = .{ .syntax = .{ .unit = .utf8, .escape = false, .alternate_separator = '\\' }, .normalization = mode, .anywhere = true };
+        for ([_][]const u8{ "cache\\one\\two", "cache/one\\two", "cache\\one/two" }) |subject| {
+            var b: sweep.Set.Builder = .init(t.allocator);
+            defer b.deinit();
+            _ = try b.add("cache/*", .{ .options = opts });
+            var set = try b.build();
+            defer set.deinit();
+            var c: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = 1 });
+            defer c.deinit();
+            var prefixes = set.ancestors(&c, subject, .file);
+            const dir = prefixes.next().?;
+            try t.expectEqual(@as(usize, 5), dir.end);
+            try t.expectEqual(@as(?u32, null), dir.last);
+            const entry = prefixes.next().?;
+            try t.expectEqual(@as(usize, 9), entry.end);
+            try t.expectEqual(@as(?u32, 0), entry.last);
+            const tail = prefixes.next().?;
+            try t.expectEqual(subject.len, tail.end);
+            try t.expectEqual(@as(?u32, null), tail.last);
+            try t.expect(prefixes.next() == null);
+        }
+    }
+}
+
+test "alternate ancestor separators preserve composed offsets and set grammar" {
+    for ([_]usize{ 1, 4096 }) |capacity| {
+        const opts: sweep.Options = .{ .syntax = .{ .unit = .utf8, .escape = false, .alternate_separator = '\\' }, .normalization = .nfc, .anywhere = true };
+        var b: sweep.Set.Builder = .init(t.allocator);
+        defer b.deinit();
+        _ = try b.add("[é]", .{ .options = opts });
+        var incompatible = opts;
+        incompatible.syntax.alternate_separator = null;
+        try t.expectError(error.SeparatorMismatch, b.add("x", .{ .options = incompatible }));
+        var set = try b.build();
+        defer set.deinit();
+        var cache: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = capacity });
+        defer cache.deinit();
+        var direct: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = capacity });
+        defer direct.deinit();
+        const subject = "\\w\\e\u{301}\\child";
+        var it = set.ancestors(&cache, subject, .file);
+        for ([_]usize{ 0, 2, 6, subject.len }) |end| {
+            const step = it.next().?;
+            try t.expectEqual(end, step.end);
+            const kind: sweep.Set.Kind = if (end == subject.len) .file else .dir;
+            try t.expectEqual(set.last(&direct, subject[0..end], kind), step.last);
+            try t.expectEqual(@as(?u32, if (end == 6) 0 else null), step.last);
+        }
+        try t.expect(it.next() == null);
+    }
+}

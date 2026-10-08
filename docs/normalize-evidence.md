@@ -64,8 +64,32 @@ Compiled *.[ch] is 10.23 → 9.92 ns/path. No claim of a speed win on every row.
 
 Shakedown is test/benchmark-only at green published main
 9357a9ab398ac25fa8a408a71e77a124bc51d311 (merge 37818062956); preflight
-remains green published main 9af905ed85cab6dbb19d9431c65ee3f41fbaa74d.
+is green published main b28046cc22055fcd32640117fc0e6965283a8ae5
+(fast 37821750595, merge 37823307574).
 No owner-fixes branch is pinned. Source and report follow the accepted book
 mission at 309bd974a045b64f93863b7931831fe9d0712910. The older book design's
 raw-pattern folding migration and LATER folding/composition account are stale;
 no book edits were made. There are no remaining semantic owner decisions.
+
+
+## Native separator follow-up
+
+Lookout merge 37839686847 exposed alternate separators missing from Set's
+ancestor boundary scan. separator-before.txt reproduces the failure against
+6310a259c0ac52f94bfe3738b1fd142f70e7df21: expected prefix end 5, found 13.
+The ancestor iterator now shares primary/alternate boundary grammar with the
+parsed reader, keeps original byte offsets and refuses incompatible set
+entries. Exact and NFC mixed-separator queries, decomposed class members,
+root prefixes and tiny-cache fallback pass in separator-after.txt and
+separator-composed-after.txt. separator-checks.txt records lint/check success.
+No caller rewrites pattern or subject text.
+
+Seven interleaved ReleaseFast pairs against the same green 6310a25 production
+sources, reversing order each round, are preserved in separator-ab.jsonl.
+Best ancestors ns/path (100/1k/10k entries): 426.359→428.277,
+502.048→495.928, 557.590→557.515. The first row regresses 0.45%; the others
+improve 1.22% and 0.01%. This corpus uses primary separators and checks the
+existing hot path; native alternate-separator correctness is established by
+regressions and the required platform suites, not equivalent-answer timing.
+The new preflight owns the plan build step; Sweep's duplicate wiring is removed.
+Graduated design documentation from green main 6310a25 remains preserved.

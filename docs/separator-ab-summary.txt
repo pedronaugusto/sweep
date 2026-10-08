@@ -1,0 +1,3 @@
+100 entries ancestors ns/path: 426.359 -> 428.277
+1000 entries ancestors ns/path: 502.048 -> 495.928
+10000 entries ancestors ns/path: 557.590 -> 557.515

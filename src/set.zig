@@ -27,8 +27,8 @@ pub const Entry = struct {
 pub const AddError = errors: {
     // A block, so a linter reading the declaration sees a type.
     break :errors Allocator.Error || syntax.PatternError || error{
-        /// The entry's separator differs from the set's first entry's: a
-        /// set stops at one separator.
+        /// The entry's primary or alternate separator differs from the
+        /// first entry's component-boundary grammar.
         SeparatorMismatch,
     };
 };
@@ -66,8 +66,11 @@ pub const Builder = struct {
     /// Adds `pattern` and returns its index, in insertion order. On error
     /// nothing is added, so indices stay dense.
     pub fn add(b: *Builder, pattern: []const u8, entry: Entry) AddError!u32 {
-        if (b.entries.items.len > 0 and b.entries.items[0].entry.options.syntax.separator != entry.options.syntax.separator)
-            return error.SeparatorMismatch;
+        if (b.entries.items.len > 0) {
+            const entry_syntax = b.entries.items[0].entry.options.syntax;
+            if (entry_syntax.separator != entry.options.syntax.separator or entry_syntax.alternate_separator != entry.options.syntax.alternate_separator)
+                return error.SeparatorMismatch;
+        }
         if (b.entries.items.len >= max_entries) return error.PatternTooLong;
         const gpa = b.gpa;
         const bounds: program_mod.Bounds = .of(pattern, entry.options);
@@ -119,7 +122,10 @@ pub const Builder = struct {
         errdefer set.deinit();
         set.dir_only = try gpa.alloc(bool, entries.len);
         for (entries, set.dir_only) |e, *d| d.* = e.entry.dir_only;
-        if (entries.len > 0) set.separator = entries[0].entry.options.syntax.separator;
+        if (entries.len > 0) {
+            set.separator = entries[0].entry.options.syntax.separator;
+            set.alternate_separator = entries[0].entry.options.syntax.alternate_separator;
+        }
         var parts: std.ArrayList(Part) = .empty;
         defer parts.deinit(gpa);
         errdefer for (parts.items) |*p| p.deinit(gpa);
@@ -157,6 +163,15 @@ pub const Set = struct {
     parts: []Part,
     /// Private: where `ancestors` stops.
     separator: ?u8,
+    /// Private: another spelling of the same component boundary.
+    alternate_separator: ?u8 = null,
+
+    fn separatorAt(s: *const Set, subject: []const u8, at: usize) ?usize {
+        const sep = s.separator orelse return null;
+        if (s.alternate_separator) |alternate|
+            return std.mem.findAnyPos(u8, subject, at, &.{ sep, alternate });
+        return std.mem.findScalarPos(u8, subject, at, sep);
+    }
 
     /// Frees the set; caches made for it are no use afterwards.
     pub fn deinit(s: *Set) void {
@@ -337,15 +352,13 @@ pub const Set = struct {
             if (a.done) return null;
             const s = a.set;
             const subject = a.subject;
-            const end = if (s.separator) |sep| std.mem.findScalarPos(u8, subject, a.at, sep) orelse subject.len else subject.len;
+            const end = s.separatorAt(subject, a.at) orelse subject.len;
             const whole = end == subject.len;
             const kind: file.Kind = if (whole) a.kind else .dir;
             var acc: Accumulator = .{ .set = s, .kind = kind, .mode = .last };
             var leads = false;
             for (s.parts, a.cache.parts) |*part, *pc| {
-                if (s.separator) |sep| {
-                    if (std.mem.findScalar(u8, subject[pc.probe.at..end], sep) != null) pc.components = .{ .set = s };
-                }
+                if (s.separatorAt(subject[pc.probe.at..end], 0) != null) pc.components = .{ .set = s };
                 pc.probe.feed(&part.strategies, subject, end, part.reading, &pc.prefixes, &pc.components);
                 pc.probe.finish(&part.strategies, subject, end, part.reading, &acc);
                 if (if (kind == .dir) pc.prefixes.any else pc.prefixes.file) |index| acc.offer(index);

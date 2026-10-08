@@ -234,7 +234,8 @@ offset and the reason.
 | `gitignore.parseLine(line)` | One ignore-file line: its pattern, `Set.Entry` and whether it is negated |
 | `isSpecial`, `literalPrefix`, `escape` | Which bytes are special; the plain leading run; a literal written as a pattern |
 
-A set's entries share one separator (`error.SeparatorMismatch` otherwise); each has
+A set's entries share primary and alternate separators (`error.SeparatorMismatch`
+otherwise); each has
 its own syntax, case and `anywhere`. A `Set` is immutable and any number of threads
 may query it, each through a `Set.Cache` of its own. Negation and include or
 exclude policy are the caller's: gitignore is `if (set.last(...)) |i| !negated[i]`.
@@ -259,9 +260,8 @@ expansion returns the union of matches; ignore-file precedence stays with caller
   files, levels and precedence are the caller's.
 - Canonical NFC is optional; no compatibility normalization or full case-fold
   expansion.
-- No `\` as a separator: turn Windows paths into `/` paths before matching, and
-  pass `.escape = false` for patterns written with `\`:
-  `for (path) |*c| if (c.* == '\\') c.* = '/';`
+- Native Windows matching accepts `.alternate_separator = '\\'` with
+  `.escape = false`. Walking emits `/` paths; matching preserves supplied bytes.
 - No negated patterns or complement `!(...)` extglobs.
 - No translation to regular expressions and no brace expansion to strings.
 

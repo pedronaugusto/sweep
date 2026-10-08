@@ -68,23 +68,6 @@ pub fn build(b: *std.Build) !void {
         // A project that depends on sweep by path, with no packages to
         // fetch: the build a consumer gets.
         preflight.addConsumerCheck(b, .{ .package = "sweep", .program = b.path("ci/consumer.zig") });
-        const dep = try b.dependencyLazy("preflight", .{});
-        const host = b.graph.host;
-        const gantry = try dep.builder.dependencyLazy("gantry", .{ .target = host, .optimize = .debug });
-        const cli = b.addExecutable(.{
-            .name = "preflight-plan",
-            .root_module = b.createModule(.{
-                .root_source_file = dep.path("src/main.zig"),
-                .target = host,
-                .optimize = .safe,
-                .imports = &.{.{ .name = "gantry", .module = gantry.module("gantry") }},
-            }),
-        });
-        const plan = b.addRunArtifact(cli);
-        plan.addArg("plan");
-        plan.addPassthruArgs();
-        plan.setCwd(b.path("."));
-        b.step("plan", "Print the hosted CI plan").dependOn(&plan.step);
     }
     return needed;
 }
