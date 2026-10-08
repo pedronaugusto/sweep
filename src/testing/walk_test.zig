@@ -66,7 +66,6 @@ test "complete Walk symlink policy and ancestor cycles" {
         else => return err,
     };
     try tmp.dir.symLink(io, "../..", "src/lib/loop", .{ .is_directory = true });
-    try tmp.dir.symLink(io, "self.c", "self.c", .{});
     var p: sweep.Pattern = try .compile(gpa, "**/*.c", .{});
     defer p.deinit();
     var followed = try sweep.expand(gpa, io, tmp.dir, .{ .pattern = &p }, .{ .follow_symlinks = true, .files_only = true, .order = .lexical });
@@ -92,4 +91,35 @@ test "complete Walk propagates directory read faults and closes its handles" {
     defer walk.deinit(fault.io());
     try std.testing.expectError(error.SystemResources, walk.next(fault.io()));
     try std.testing.expectEqual(@as(u64, 1), fault.count(.dirRead));
+}
+
+test "complete Walk skips reported link loops and propagates unexpected Io errors" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "plain.txt", .data = "" });
+    try tmp.dir.createDirPath(io, "inside");
+    const root = try tmp.dir.openDir(io, "inside", .{ .iterate = true });
+    defer root.close(io);
+    root.symLink(io, "../plain.txt", "link.c", .{}) catch |err| switch (err) {
+        error.AccessDenied, error.PermissionDenied => return error.SkipZigTest,
+        else => return err,
+    };
+    var p = try sweep.Pattern.compile(gpa, "**/*.c", .{});
+    defer p.deinit();
+    // A backend can report an unresolved link as either a loop or an
+    // unexpected OS status. Test the Io boundary without assuming its mapping.
+    for ([_]anyerror{ error.SymLinkLoop, error.Unexpected }) |failure| {
+        const fault = try shakedown.FaultIo.init(gpa, io, .{ .plan = &.{.{ .at = .{ .nth = .{ .call = .dirStatFile, .n = 1 } }, .fault = .{ .fail = failure } }} });
+        defer fault.deinit();
+        {
+            var walk = try sweep.Walk.open(gpa, fault.io(), root, .{ .pattern = &p }, .{ .follow_symlinks = true });
+            defer walk.deinit(fault.io());
+            if (failure == error.SymLinkLoop) {
+                try std.testing.expectEqual(@as(?sweep.Walk.Entry, null), try walk.next(fault.io()));
+            } else try std.testing.expectError(error.Unexpected, walk.next(fault.io()));
+        }
+        try std.testing.expectEqual(@as(u64, 1), fault.count(.dirStatFile));
+        try std.testing.expectEqual(fault.count(.dirOpenDir), fault.count(.dirClose));
+    }
 }
