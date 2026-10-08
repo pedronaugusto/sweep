@@ -93,3 +93,12 @@ existing hot path; native alternate-separator correctness is established by
 regressions and the required platform suites, not equivalent-answer timing.
 The new preflight owns the plan build step; Sweep's duplicate wiring is removed.
 Graduated design documentation from green main 6310a25 remains preserved.
+
+
+Final dependency recheck found newer green published shakedown main
+0ebf97bba845a93833f90be6befc49cdc51084f6 (merge 37834210320; published main
+run 37836509861). The final test-only pin advances to it. Its changes are
+network test coverage and validation notes; the benchmark implementation and
+Sweep production sources measured above are unchanged. Fast 37844429187 and
+merge 37845593310 validate the separator code head 5125811; final-head gates
+are repeated after the pin correction rather than attributed to that older head.
