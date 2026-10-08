@@ -1,0 +1,17 @@
+test
++- run test sweep-tests w
+preflight: test seed 1825534150 (reproduce with PREFLIGHT_TEST_SEED=1825534150)
+failed command: ./.zig-cache/o/7b41c054b3d86132e8b3ee3b6c4936f1/sweep-tests --cache-dir=./.zig-cache --seed=0x6ccf70c6 --listen=-
+
+Build Summary: 10/10 steps succeeded; 3/3 tests passed
+test success
++- run test sweep-tests 3 pass (3 total) 31ms MaxRSS:5M
+|  +- compile test sweep-tests debug native cached 57ms MaxRSS:31M
+|     +- options cached
++- examples success
+|  +- run exe usage success 12ms
+|     +- compile exe usage debug native cached 57ms MaxRSS:31M
++- run exe bench success 167ms
+   +- compile exe bench debug native cached 57ms MaxRSS:31M
+   +- WriteFile success
+

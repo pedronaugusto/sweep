@@ -5,6 +5,9 @@ dialects beside it, for one pattern or many at once. Matching time is linear
 in the subject for every pattern, by construction: there is no backtracking and
 no recursion anywhere, the parser included.
 
+The filesystem normalization seam is work in progress; `foldCase` shares the
+Unicode simple-fold mapping without changing glob scalar semantics.
+
 ## Install
 
 Requires Zig 0.17.0. Fetch with `zig fetch --save

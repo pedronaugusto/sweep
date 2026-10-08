@@ -1,0 +1,4 @@
+matrix={"include":[{"os":"ubuntu-latest","name":"Linux Debug","step":"preflight-fast","args":"-Doptimize=debug","shard":"","setup":true,"job_timeout":20,"cache_key":"fast-linux-debug-0","artifact":""}]}
+compile_matrix={"include":[]}
+run_matrix={"include":[]}
+portable=false

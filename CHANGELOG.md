@@ -17,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `foldCase` exposes the Unicode 18 default simple scalar mapping used by
+  `Case.unicode`, so filesystem consumers share one case-folding owner.
+
 - `Walk` and `expand`: Pattern/Set filesystem expansion with invariant-base traversal, pruning, hidden-entry and symlink policies, cycle checks and global lexical ordering.
 - `Syntax.editorconfig`, signed 64-bit numeric intervals, regular extglobs and Unicode 18.0.0 simple folding with `Case.unicode`.
 - `Pattern.captureCache` and `Pattern.captures`: optional capture execution with reusable per-thread scratch and byte offsets.

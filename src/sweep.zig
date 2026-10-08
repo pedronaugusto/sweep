@@ -52,3 +52,10 @@ pub const Matcher = @import("walk.zig").Matcher;
 pub const Paths = @import("walk.zig").Paths;
 /// Expands a matcher against a directory.
 pub const expand = @import("walk.zig").expand;
+
+/// Unicode 18 default simple case folding of one scalar.
+/// This is the same mapping used by `Case.unicode`: no normalization,
+/// expansion or Turkic mappings. Codes outside Unicode stay unchanged,
+/// including a caller's distinct codes for ill-formed UTF-8 bytes.
+/// Sweep owns the mapping; filesystem identity policy remains the caller's.
+pub const foldCase = @import("unicode.zig").fold;
