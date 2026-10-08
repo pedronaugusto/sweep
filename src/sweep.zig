@@ -43,3 +43,12 @@ pub const literalPrefix = helpers.literalPrefix;
 pub const escape = helpers.escape;
 /// Errors from `escape`.
 pub const EscapeError = helpers.EscapeError;
+
+/// Filesystem glob expansion with pruning and explicit traversal policy.
+pub const Walk = @import("walk.zig").Walk;
+/// A borrowed Pattern or Set used by a filesystem walk.
+pub const Matcher = @import("walk.zig").Matcher;
+/// Owned glob expansion results.
+pub const Paths = @import("walk.zig").Paths;
+/// Expands a matcher against a directory.
+pub const expand = @import("walk.zig").expand;

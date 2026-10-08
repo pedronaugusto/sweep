@@ -80,7 +80,7 @@ pub fn options(s: Source) sweep.Options {
             .unit = s.value(sweep.Syntax.Unit),
             .leading_dot = s.value(sweep.Syntax.LeadingDot),
         },
-        .case = s.value(sweep.Case),
+        .case = ([_]sweep.Case{ .sensitive, .ascii, .ascii_git })[s.index(3)],
         .anywhere = s.value(bool),
     };
 }

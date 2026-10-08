@@ -8,6 +8,7 @@ const parse = @import("parse.zig");
 const strategy_mod = @import("strategy.zig");
 const tables = @import("tables.zig");
 const lazy = @import("lazy.zig");
+const direct = @import("direct.zig");
 
 const Allocator = std.mem.Allocator;
 const file = @This();
@@ -69,7 +70,7 @@ pub const Builder = struct {
             return error.SeparatorMismatch;
         if (b.entries.items.len >= max_entries) return error.PatternTooLong;
         const gpa = b.gpa;
-        const bounds: program_mod.Bounds = .of(pattern);
+        const bounds: program_mod.Bounds = .of(pattern, entry.options);
         var builder: program_mod.Builder = .{
             .nodes = try gpa.alloc(program_mod.Node, bounds.nodes),
             .classes = &.{},
@@ -231,6 +232,7 @@ pub const Set = struct {
         probe: tables.Probe = .{},
         /// Prefix entries matched so far in an `ancestors` pass.
         prefixes: Prefixes = .{},
+        components: Prefixes = .{},
     };
 
     /// The best prefix-strategy entries an `ancestors` pass has met.
@@ -304,6 +306,7 @@ pub const Set = struct {
             pc.cursor = .begin(&part.automaton, &pc.lazy);
             pc.probe = .{};
             pc.prefixes = .{ .set = s };
+            pc.components = .{ .set = s };
         }
         return .{ .set = s, .cache = c, .subject = subject, .kind = kind };
     }
@@ -340,9 +343,13 @@ pub const Set = struct {
             var acc: Accumulator = .{ .set = s, .kind = kind, .mode = .last };
             var leads = false;
             for (s.parts, a.cache.parts) |*part, *pc| {
-                pc.probe.feed(&part.strategies, subject, end, part.reading, &pc.prefixes);
+                if (s.separator) |sep| {
+                    if (std.mem.findScalar(u8, subject[pc.probe.at..end], sep) != null) pc.components = .{ .set = s };
+                }
+                pc.probe.feed(&part.strategies, subject, end, part.reading, &pc.prefixes, &pc.components);
                 pc.probe.finish(&part.strategies, subject, end, part.reading, &acc);
                 if (if (kind == .dir) pc.prefixes.any else pc.prefixes.file) |index| acc.offer(index);
+                if (if (kind == .dir) pc.components.any else pc.components.file) |index| acc.offer(index);
                 pc.cursor.advance(subject, end);
                 pc.cursor.offer(&acc);
                 if (!leads) leads = part.strategies.leadsTo(subject[0..end], part.reading);
@@ -361,7 +368,9 @@ pub const Set = struct {
         for (s.parts, c.parts) |*part, *cache| {
             part.strategies.visit(subject, part.reading, acc);
             if (acc.mode == .any and acc.found) return;
-            part.automaton.visit(&cache.lazy, subject, acc);
+            if (part.single) |single| {
+                if (single.compiled.matches(single.source, subject)) acc.offer(single.index);
+            } else part.automaton.visit(&cache.lazy, subject, acc);
         }
     }
 };
@@ -417,18 +426,34 @@ const Part = struct {
     reading: program_mod.Reading,
     strategies: tables.Strategies,
     automaton: lazy.Automaton,
+    single: ?struct { source: []u8, compiled: direct.Compiled, index: u32 } = null,
 
     fn build(gpa: Allocator, entries: []const Builder.Stored, reading: program_mod.Reading) Allocator.Error!Part {
         var strategies: tables.Strategies = try .build(gpa, entries, reading);
         errdefer strategies.deinit(gpa);
         var automaton: lazy.Automaton = try .build(gpa, entries, reading);
         errdefer automaton.deinit(gpa);
-        return .{ .reading = reading, .strategies = strategies, .automaton = automaton };
+        var part: Part = .{ .reading = reading, .strategies = strategies, .automaton = automaton };
+        var only: ?usize = null;
+        for (entries, 0..) |entry, index| if (entry.reading.eql(reading) and entry.strategy == null) {
+            if (only != null) return part;
+            only = index;
+        };
+        if (only) |index| {
+            const entry = entries[index];
+            if (direct.Compiled.init(entry.pattern, entry.entry.options, entry.pattern.len, .{ .units = entry.pattern.len, .brackets = entry.pattern.len })) |compiled| part.single = .{
+                .source = try gpa.dupe(u8, entry.pattern),
+                .compiled = compiled,
+                .index = @intCast(index),
+            };
+        }
+        return part;
     }
 
     fn deinit(p: *Part, gpa: Allocator) void {
         p.strategies.deinit(gpa);
         p.automaton.deinit(gpa);
+        if (p.single) |single| gpa.free(single.source);
         p.* = undefined;
     }
 };

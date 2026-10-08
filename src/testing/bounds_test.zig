@@ -15,10 +15,11 @@ const Owned = struct {
     b: program.Builder,
     reach: [3][]u64,
     kernel: []u64,
+    seen: [3][]u64,
     options: sweep.Options,
 
     fn init(pattern: []const u8, options: sweep.Options) !Owned {
-        const bounds: program.Bounds = .of(pattern);
+        const bounds: program.Bounds = .of(pattern, options);
         var b: program.Builder = .{
             .nodes = try gpa.alloc(program.Node, bounds.nodes),
             .classes = try gpa.alloc(program.Class, bounds.classes),
@@ -27,8 +28,9 @@ const Owned = struct {
         };
         try parse.parse(&b, pattern, options, .{});
         const words = nfa.words(b.node_len);
-        var owned: Owned = .{ .b = b, .reach = undefined, .kernel = try gpa.alloc(u64, words), .options = options };
+        var owned: Owned = .{ .b = b, .reach = undefined, .seen = undefined, .kernel = try gpa.alloc(u64, words), .options = options };
         for (&owned.reach) |*r| r.* = try gpa.alloc(u64, words);
+        for (&owned.seen) |*r| r.* = try gpa.alloc(u64, words);
         return owned;
     }
 
@@ -39,13 +41,14 @@ const Owned = struct {
         gpa.free(o.b.frames);
         gpa.free(o.kernel);
         for (o.reach) |r| gpa.free(r);
+        for (o.seen) |r| gpa.free(r);
         o.* = undefined;
     }
 
     /// Runs `subject` and checks the bound outside the assertion too.
     fn run(o: *Owned, subject: []const u8) !bool {
         const p = o.b.program(.of(o.options));
-        var sim: nfa.Sim = .init(p, .{ .reach = o.reach, .kernel = o.kernel });
+        var sim: nfa.Sim = .init(p, .{ .reach = o.reach, .kernel = o.kernel, .seen = o.seen });
         const matched = sim.run(subject);
         try std.testing.expect(sim.steps <= (sim.units + 1) * p.states());
         return matched;

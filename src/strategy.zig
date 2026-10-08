@@ -21,6 +21,8 @@ pub const Kind = enum {
     ends,
     /// The subject is the literal or ends with a separator and the literal (`**/lit`).
     tail,
+    /// The last component starts with the literal (`**/lit*`).
+    basename_starts,
 };
 
 pub const Strategy = struct {
@@ -38,6 +40,11 @@ pub const Strategy = struct {
                 std.mem.findScalar(u8, subject[lit.len..], separatorByte(reading)) == null,
             .ends => subject.len >= lit.len and eql(reading, subject[subject.len - lit.len ..], lit),
             .tail => tail(reading, subject, lit),
+            .basename_starts => blk: {
+                const start = if (std.mem.findScalarLast(u8, subject, separatorByte(reading))) |at| at + 1 else 0;
+                const base = subject[start..];
+                break :blk base.len >= lit.len and eql(reading, base[0..lit.len], lit);
+            },
         };
     }
 };
@@ -91,6 +98,7 @@ fn bytesExact(p: Program) bool {
 /// Recognises a strategy in a one-entry program (ending in its accept).
 pub fn recognise(p: Program) Shape {
     var shape: Shape = .{};
+    if (p.reading.unicode) return .{ .tail_start = p.nodes.len - 1 };
     const nodes = p.nodes[0 .. p.nodes.len - 1];
     shape.head = literalRun(nodes, 0);
     shape.tail_start = tailRun(nodes, shape.head);
@@ -124,6 +132,8 @@ pub fn recognise(p: Program) Shape {
         }
         var j = rest;
         while (j < n and isLit(nodes[j])) j += 1;
+        if (j == n - 1 and j > rest and nodes[n - 1].op == .star and nodes[n - 1].arg == 0 and allLiterals(nodes[rest..j]))
+            return .{ .strategy = .basename_starts, .first = rest, .end = j };
         if (j == n and j > rest and nodes[rest].op != .sep) return .{ .strategy = .tail, .first = rest, .end = n };
     }
     // A text-mode `*lit`.
@@ -133,6 +143,11 @@ pub fn recognise(p: Program) Shape {
         if (j == n) return .{ .strategy = .ends, .first = 1, .end = n };
     }
     return shape;
+}
+
+fn allLiterals(nodes: []const program_mod.Node) bool {
+    for (nodes) |node| if (node.op != .lit) return false;
+    return true;
 }
 
 /// The literal nodes from `from` on, before the first that is not one.

@@ -6,7 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Plain compiled byte patterns reuse validated direct execution; fixed-width star tails and basename prefixes avoid DFA construction.
+- Small compilations use stack construction, and Sets hash component prefixes, including patterns longer than `Pattern.max_units`.
+- One-shot literal rejection skips dialect setup when the first byte decides the result.
+
 ### Added
+
+- `Walk` and `expand`: Pattern/Set filesystem expansion with invariant-base traversal, pruning, hidden-entry and symlink policies, cycle checks and global lexical ordering.
+- `Syntax.editorconfig`, signed 64-bit numeric intervals, regular extglobs and Unicode 18.0.0 simple folding with `Case.unicode`.
+- `Pattern.captureCache` and `Pattern.captures`: optional capture execution with reusable per-thread scratch and byte offsets.
 
 - `match(pattern, subject, options)`: whether a glob matches a whole subject, with no allocation, in time linear in the subject.
 - `Syntax` with the presets `git`, `git_text`, `glob` and `posix`, and the fields `separator`, `globstar` (`off`, `component`, `anywhere`), `escape`, `brackets`, `braces`, `unit` and `leading_dot`; `Case` with `sensitive`, `ascii` and git's `ascii_git`; `Options.anywhere`; `Diagnostics` for a refused pattern.

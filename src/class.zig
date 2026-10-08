@@ -7,6 +7,7 @@
 const std = @import("std");
 const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
+const unicode = @import("unicode.zig");
 
 const Code = unit.Code;
 
@@ -118,7 +119,8 @@ pub const Filler = struct {
     }
 
     /// A single member, as written.
-    pub fn single(f: *Filler, member: Code) void {
+    pub fn single(f: *Filler, original: Code) void {
+        const member = if (f.case == .unicode) unicode.fold(original) else original;
         if (member < 256) {
             const byte: u8 = @intCast(member);
             switch (f.case) {
@@ -126,7 +128,7 @@ pub const Filler = struct {
                 // `.ascii` member counts for its lower-case form; the
                 // `.ascii_git` member compares unfolded and so never meets
                 // an upper-case letter at all.
-                .ascii => f.class.setLow(std.ascii.toLower(byte)),
+                .ascii, .unicode => f.class.setLow(std.ascii.toLower(byte)),
                 .sensitive, .ascii_git => f.class.setLow(byte),
             }
         } else f.addRange(member, member);
@@ -143,7 +145,7 @@ pub const Filler = struct {
                 switch (f.case) {
                     .sensitive => f.class.setLow(byte),
                     // Either case of a letter in the range matches.
-                    .ascii => f.class.setLow(std.ascii.toLower(byte)),
+                    .ascii, .unicode => f.class.setLow(std.ascii.toLower(byte)),
                     // git retries a lower-case text byte as upper case.
                     .ascii_git => {
                         f.class.setLow(byte);
@@ -153,6 +155,9 @@ pub const Filler = struct {
             }
         }
         if (hi >= 256) f.addRange(@max(lo, 256), hi);
+        if (f.case == .unicode) for (unicode.pairs) |pair| {
+            if (pair.from >= lo and pair.from <= hi and (pair.to < lo or pair.to > hi)) f.single(pair.to);
+        };
     }
 
     /// A `[:name:]` member.
@@ -161,7 +166,7 @@ pub const Filler = struct {
             const byte: u8 = @intCast(c);
             const in = switch (f.case) {
                 .sensitive => class.has(byte, false),
-                .ascii => class.has(byte, false) or class.has(swapCase(byte), false),
+                .ascii, .unicode => class.has(byte, false) or class.has(swapCase(byte), false),
                 .ascii_git => class.has(byte, true),
             };
             if (in) f.class.setLow(byte);

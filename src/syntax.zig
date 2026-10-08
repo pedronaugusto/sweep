@@ -14,10 +14,25 @@ pub const Syntax = struct {
     escape: bool = true,
     /// What `[` opens.
     brackets: Brackets = .strict,
+    /// Brackets containing an unescaped separator are literal text.
+    bracket_separator_literal: bool = false,
     /// `{a,b,c}` alternation, nestable, with empty alternatives allowed.
     braces: bool = false,
+    /// A separator-bounded `/**/` also matches zero directories when every
+    /// globstar crosses separators.
+    globstar_slash: bool = false,
     /// What one `?` or one bracket consumes.
     unit: Unit = .byte,
+    /// Decimal integer intervals `{n..m}`, compiled without expansion.
+    numeric_ranges: bool = false,
+    /// Regular extglobs `?()`, `*()`, `+()` and `@()`.
+    extglob: bool = false,
+    /// Separator-free patterns match the last component at any depth.
+    basename: bool = false,
+    /// A leading separator anchors relative to the supplied root.
+    root_slash: bool = false,
+    /// Brace groups without a comma keep their braces literally.
+    single_brace_literal: bool = false,
     /// Whether a `.` that begins a component is hidden from wildcards.
     leading_dot: LeadingDot = .ordinary,
 
@@ -67,6 +82,8 @@ pub const Syntax = struct {
     pub const git: Syntax = .{};
     /// git's `wildmatch()` without `WM_PATHNAME`; `fnmatch` with no flags.
     pub const git_text: Syntax = .{ .separator = null };
+    /// EditorConfig path globs: `**` crosses separators anywhere; integer ranges.
+    pub const editorconfig: Syntax = .{ .globstar = .anywhere, .globstar_slash = true, .braces = true, .numeric_ranges = true, .unit = .utf8, .basename = true, .root_slash = true, .single_brace_literal = true, .bracket_separator_literal = true };
     /// Path globs with braces over UTF-8 scalars.
     pub const glob: Syntax = .{ .braces = true, .unit = .utf8 };
     /// `fnmatch(FNM_PATHNAME | FNM_PERIOD)` in a UTF-8 locale.
@@ -85,6 +102,9 @@ pub const Case = enum {
     /// and `[A]` match nothing, while a range is retried with the upper-case
     /// letter, so `[A-Z]` matches `q`.
     ascii_git,
+    /// Default Unicode simple case folding over UTF-8 scalars. Does not
+    /// normalize or expand characters; invalid UTF-8 bytes stay distinct.
+    unicode,
 };
 
 /// What a pattern means, given with each call or compile.
@@ -118,6 +138,12 @@ pub const Diagnostics = struct {
         unclosed_brace,
         /// A `}` with no opening `{`.
         unmatched_brace,
+        /// An extglob group has no closing `)`.
+        unclosed_extglob,
+        /// Complement extglob cannot be represented by the regular parser.
+        unsupported_extglob,
+        /// A bound is outside signed 64-bit integers, or lower exceeds upper.
+        invalid_range,
         /// The pattern needs more room than the call has.
         too_long,
     };

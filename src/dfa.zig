@@ -9,6 +9,7 @@ const std = @import("std");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");
 const nfa = @import("nfa.zig");
+const unicode = @import("unicode.zig");
 
 const Allocator = std.mem.Allocator;
 const Program = program_mod.Program;
@@ -19,6 +20,8 @@ const Code = unit.Code;
 pub const Classes = struct {
     /// The class of each code below 256.
     low: [256]u16,
+    unicode: bool,
+    separator: ?Code,
     /// Codes from 256 on: the start of each run of codes in one class,
     /// ascending, and the run's class.
     starts: []u32,
@@ -30,8 +33,13 @@ pub const Classes = struct {
         return c.reps.len;
     }
 
-    pub fn of(c: *const Classes, code: Code) u16 {
-        if (code < 256) return c.low[code];
+    pub fn of(c: *const Classes, raw: Code) u16 {
+        if (raw < 256) return c.low[raw];
+        const code = if (c.unicode) unicode.fold(raw) else raw;
+        if (code < 256) {
+            if (c.unicode and c.separator == code and unit.isLower(code)) return c.low[code - 32];
+            return c.low[code];
+        }
         // The last run starting at or below `code`.
         var lo: usize = 0;
         var hi: usize = c.starts.len;
@@ -90,7 +98,7 @@ pub const Classes = struct {
             .class => classes = refiner.split(ids, classes, reps, p, .class, k),
             else => {},
         };
-        var out: Classes = .{ .low = undefined, .starts = &.{}, .ids = &.{}, .reps = &.{} };
+        var out: Classes = .{ .low = undefined, .unicode = p.reading.unicode, .separator = p.reading.separator, .starts = &.{}, .ids = &.{}, .reps = &.{} };
         @memcpy(&out.low, ids[0..256]);
         out.starts = try gpa.dupe(u32, bounds.items);
         errdefer gpa.free(out.starts);
@@ -153,6 +161,7 @@ const Refiner = struct {
 /// Whether each kernel node can still reach an accept: bit 0 at a position
 /// that is not a component start, bit 1 at one.
 pub fn liveness(gpa: Allocator, p: Program) Allocator.Error![]u2 {
+    for (p.nodes, 0..) |node, i| if ((node.op == .jump or node.op == .split) and node.arg <= i) return cyclicLiveness(gpa, p);
     const n = p.nodes.len;
     const kernel = try gpa.alloc(u2, n);
     errdefer gpa.free(kernel);
@@ -169,6 +178,110 @@ pub fn liveness(gpa: Allocator, p: Program) Allocator.Error![]u2 {
         entered[i] = enterLive(p, kernel, entered, i);
     }
     return kernel;
+}
+
+// Reverse reachability over entered states (three contexts × two
+// component-start bits) and consuming kernels (two bits). Every edge is
+// inspected once, including epsilon cycles from repeated extglobs.
+fn cyclicLiveness(gpa: Allocator, p: Program) Allocator.Error![]u2 {
+    const Graph = struct {
+        const Edge = struct { from: u32, next: u32 };
+        heads: []u32,
+        edges: std.ArrayList(Edge) = .empty,
+        gpa: Allocator,
+        const Self = @This();
+        fn edge(g: *Self, from: usize, to: usize) Allocator.Error!void {
+            try g.edges.append(g.gpa, .{ .from = @intCast(from), .next = g.heads[to] });
+            g.heads[to] = @intCast(g.edges.items.len - 1);
+        }
+        fn entered(t: usize, c: program_mod.Context, start: bool) usize {
+            return t * 8 + @as(usize, @backingInt(c)) * 2 + @intFromBool(start);
+        }
+        fn kernel(t: usize, start: bool) usize {
+            return t * 8 + 6 + @intFromBool(start);
+        }
+    };
+    const n = p.nodes.len;
+    const heads = try gpa.alloc(u32, 8 * n);
+    defer gpa.free(heads);
+    @memset(heads, std.math.maxInt(u32));
+    var g: Graph = .{ .heads = heads, .gpa = gpa };
+    defer g.edges.deinit(gpa);
+    const reached = try gpa.alloc(bool, heads.len);
+    defer gpa.free(reached);
+    @memset(reached, false);
+    var queue: std.ArrayList(u32) = .empty;
+    defer queue.deinit(gpa);
+    for (p.nodes, 0..) |node, t| {
+        for ([_]program_mod.Context{ .sep, .other, .promise }) |c| for ([_]bool{ false, true }) |start| {
+            const from = Graph.entered(t, c, start);
+            switch (node.op) {
+                .split => {
+                    try g.edge(from, Graph.entered(t + 1, c, start));
+                    try g.edge(from, Graph.entered(node.arg, c, start));
+                },
+                .jump => try g.edge(from, Graph.entered(node.arg, c, start)),
+                .save => try g.edge(from, Graph.entered(t + 1, c, start)),
+                .star, .gstar => {
+                    const allowed = if (node.op == .gstar) c == .sep else c != .promise;
+                    if (allowed) {
+                        try g.edge(from, Graph.kernel(t, start));
+                        try g.edge(from, Graph.entered(if (node.op == .gstar) exitOf(node, t) else t + 1, if (node.op == .gstar) .promise else .other, start));
+                    }
+                },
+                .lit, .any, .class => if (c != .promise) {
+                    try g.edge(from, Graph.kernel(t, start));
+                },
+                .dot => if (c != .promise) {
+                    try g.edge(from, Graph.kernel(if (c == .sep) t else t + 1, start));
+                },
+                .dot_plain => {},
+                .sep => if (c == .promise and node.arg == 0) {
+                    if (start) try g.edge(from, Graph.entered(t + 1, .sep, true));
+                } else {
+                    try g.edge(from, Graph.kernel(t, start));
+                },
+                .accept => {
+                    reached[from] = true;
+                    try queue.append(gpa, @intCast(from));
+                },
+            }
+        };
+        for ([_]bool{ false, true }) |start| {
+            const from = Graph.kernel(t, start);
+            if (node.op == .accept) {
+                reached[from] = true;
+                try queue.append(gpa, @intCast(from));
+                continue;
+            }
+            for (outcomes(p, t, start)) |landing| {
+                if (!landing.possible) continue;
+                switch (node.op) {
+                    .star, .gstar => {
+                        try g.edge(from, Graph.kernel(t, landing.start));
+                        try g.edge(from, Graph.entered(if (node.op == .gstar) exitOf(node, t) else t + 1, if (node.op == .gstar) .promise else .other, landing.start));
+                    },
+                    .lit, .any, .class, .dot, .dot_plain, .sep => try g.edge(from, Graph.entered(if (node.op == .dot) t + 2 else t + 1, if (node.op == .sep) .sep else .other, landing.start)),
+                    else => {},
+                }
+            }
+        }
+    }
+    var at: usize = 0;
+    while (at < queue.items.len) : (at += 1) {
+        var edge = heads[queue.items[at]];
+        while (edge != std.math.maxInt(u32)) {
+            const e = g.edges.items[edge];
+            if (!reached[e.from]) {
+                reached[e.from] = true;
+                try queue.append(gpa, e.from);
+            }
+            edge = e.next;
+        }
+    }
+    const out = try gpa.alloc(u2, n);
+    for (out, 0..) |*bits, t| bits.* = @as(u2, @intFromBool(reached[Graph.kernel(t, false)])) | @as(u2, @intFromBool(reached[Graph.kernel(t, true)])) << 1;
+    return out;
 }
 
 fn bitOf(set: u6, context: program_mod.Context, start: bool) bool {
@@ -197,6 +310,7 @@ fn enterOne(p: Program, kernel: []const u2, entered: []const u6, t: usize, conte
     return switch (node.op) {
         .split => bitOf(entered[t + 1], context, start) or bitOf(entered[node.arg], context, start),
         .jump => bitOf(entered[node.arg], context, start),
+        .save => bitOf(entered[t + 1], context, start),
         .gstar => context == .sep and (bitOf(entered[exitOf(node, t)], .promise, start) or kernelBit(kernel, t, start)),
         .star => context != .promise and (bitOf(entered[t + 1], .other, start) or kernelBit(kernel, t, start)),
         .lit, .any, .class => context != .promise and kernelBit(kernel, t, start),
@@ -253,7 +367,7 @@ fn kernelLive(p: Program, entered: []const u6, k: usize) u2 {
             }
         },
         .accept => out = 3,
-        .split, .jump => {},
+        .split, .jump, .save => {},
     }
     return out;
 }
@@ -288,7 +402,7 @@ fn outcomes(p: Program, k: usize, start: bool) [2]Landing {
             const reach = classReach(p.classes[node.arg], r);
             on_other = reach.other or (reach.dot and !hidden_dot);
         },
-        .split, .jump, .accept => {},
+        .split, .jump, .save, .accept => {},
     }
     return .{ .{ .possible = on_other, .start = false }, .{ .possible = on_sep, .start = true } };
 }
@@ -309,6 +423,10 @@ fn classReach(class: program_mod.Class, r: program_mod.Reading) struct { other: 
 
 /// The raw codes whose canonical form is `canon`.
 fn preimage(r: program_mod.Reading, canon: Code) [2]?Code {
+    if (r.unicode) {
+        if (unicode.fold(canon) != canon) return .{ null, null };
+        return .{ canon, if (unit.isLower(canon)) canon - 32 else null };
+    }
     if (!r.fold) return .{ canon, null };
     if (unit.isUpper(canon)) return .{ null, null };
     if (unit.isLower(canon)) return .{ canon, canon - ('a' - 'A') };

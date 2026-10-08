@@ -24,6 +24,7 @@ pub const Scratch = struct {
     reach: [3][]u64,
     /// Consuming threads (and accepts) after closing.
     kernel: []u64,
+    seen: [3][]u64,
 };
 
 /// A simulation in progress over one program.
@@ -31,6 +32,7 @@ pub const Sim = struct {
     program: Program,
     reach: [3][]u64,
     kernel: []u64,
+    seen: [3][]u64,
     /// The lowest word of `reach` that may hold a bit.
     low: usize = 0,
     /// (node, context) states closed so far.
@@ -41,7 +43,7 @@ pub const Sim = struct {
     start: bool = true,
 
     pub fn init(program: Program, scratch: Scratch) Sim {
-        return .{ .program = program, .reach = scratch.reach, .kernel = scratch.kernel };
+        return .{ .program = program, .reach = scratch.reach, .kernel = scratch.kernel, .seen = scratch.seen };
     }
 
     /// Starts over at position 0.
@@ -52,6 +54,7 @@ pub const Sim = struct {
         sim.steps = 0;
         sim.units = 0;
         sim.start = true;
+        for (sim.seen) |s| @memset(s, 0);
         sim.enter(0, .sep);
         sim.close();
     }
@@ -60,6 +63,7 @@ pub const Sim = struct {
     pub fn step(sim: *Sim, code: Code) bool {
         const p = sim.program;
         const at_start = sim.start;
+        for (sim.seen) |s| @memset(s, 0);
         var any = false;
         for (sim.kernel, 0..) |*word, w| {
             var bits = word.*;
@@ -75,7 +79,7 @@ pub const Sim = struct {
                     .sep => sim.enter(k + 1, .sep),
                     .star => sim.mark(.other, k),
                     .gstar => sim.mark(.promise, k),
-                    .split, .jump, .accept => unreachable,
+                    .split, .jump, .save, .accept => unreachable,
                 }
             }
         }
@@ -140,6 +144,7 @@ pub const Sim = struct {
     };
 
     fn mark(sim: *Sim, context: Context, k: usize) void {
+        if (sim.seen[@backingInt(context)][k / 64] >> @intCast(k % 64) & 1 != 0) return;
         const w = k / 64;
         sim.reach[@backingInt(context)][w] |= @as(u64, 1) << @intCast(k % 64);
         if (w < sim.low) sim.low = w;
@@ -149,7 +154,7 @@ pub const Sim = struct {
     fn enter(sim: *Sim, t: usize, context: Context) void {
         const node = sim.program.nodes[t];
         switch (node.op) {
-            .split, .jump => sim.mark(context, t),
+            .split, .jump, .save => sim.mark(context, t),
             .gstar => if (context == .sep) sim.mark(.promise, t),
             .star, .lit, .any, .class => if (context != .promise) sim.mark(.other, t),
             .dot => switch (context) {
@@ -182,16 +187,25 @@ pub const Sim = struct {
             const in_sep = r0[w] & mask != 0;
             const in_other = r1[w] & mask != 0;
             const in_promise = r2[w] & mask != 0;
+            sim.seen[0][w] |= if (in_sep) mask else 0;
+            sim.seen[1][w] |= if (in_other) mask else 0;
+            sim.seen[2][w] |= if (in_promise) mask else 0;
             r0[w] &= ~mask;
             r1[w] &= ~mask;
             r2[w] &= ~mask;
             sim.steps += @as(u64, @intFromBool(in_sep)) + @intFromBool(in_other) + @intFromBool(in_promise);
+            sim.low = w;
             const node = p.nodes[k];
             switch (node.op) {
                 .split => {
                     if (in_sep) sim.fork(k, node.arg, .sep);
                     if (in_other) sim.fork(k, node.arg, .other);
                     if (in_promise) sim.fork(k, node.arg, .promise);
+                },
+                .save => {
+                    if (in_sep) sim.enter(k + 1, .sep);
+                    if (in_other) sim.enter(k + 1, .other);
+                    if (in_promise) sim.enter(k + 1, .promise);
                 },
                 .jump => {
                     if (in_sep) sim.enter(node.arg, .sep);
@@ -212,6 +226,7 @@ pub const Sim = struct {
                 },
                 .lit, .dot, .dot_plain, .any, .class, .accept => sim.keep(k),
             }
+            w = sim.low;
         }
         sim.low = r0.len;
         // The bound the design promises: each (node, context) at most once

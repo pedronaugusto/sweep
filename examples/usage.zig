@@ -14,6 +14,7 @@ pub fn main(init: std.process.Init) !void {
     // --- README:usage ---
     try compiled(gpa);
     try ignore(gpa);
+    try walking(gpa, init.io);
 }
 
 fn compiled(gpa: std.mem.Allocator) !void {
@@ -25,6 +26,12 @@ fn compiled(gpa: std.mem.Allocator) !void {
     std.debug.assert(std.mem.eql(u8, pattern.base(), "src"));
     std.debug.assert(pattern.leadsTo("src/net"));
     std.debug.assert(!pattern.leadsTo("docs"));
+    // Capture scratch is separate and reusable, with one cache per thread.
+    var captures = try pattern.captureCache(gpa);
+    defer captures.deinit();
+    var out: [4]?sweep.Pattern.Capture = undefined;
+    std.debug.assert(try pattern.captures(&captures, "src/net/test_io.zig", &out));
+    // Captures include the globstar directory and the filename's star.
     // --- README:pattern ---
 }
 
@@ -58,4 +65,20 @@ fn ignore(gpa: std.mem.Allocator) !void {
         if (step.last) |i| if (!negated[i]) break;
     }
     // --- README:set ---
+}
+
+fn walking(gpa: std.mem.Allocator, io: std.Io) !void {
+    // --- README:walk ---
+    var pattern = try sweep.Pattern.compile(gpa, "src/**/*.zig", .{});
+    defer pattern.deinit();
+    var walk = try sweep.Walk.open(gpa, io, .cwd(), .{ .pattern = &pattern }, .{
+        .hidden = false,
+        .files_only = true,
+    });
+    defer walk.deinit(io);
+    while (try walk.next(io)) |entry| {
+        // entry.path is borrowed until the next call or deinit.
+        std.mem.doNotOptimizeAway(entry.path);
+    }
+    // --- README:walk ---
 }

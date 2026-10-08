@@ -56,6 +56,9 @@ pub fn main(init: std.process.Init) !void {
     try compile(r, gpa, if (smoke) 1 else 2_000);
     for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
     try adversarial(r, gpa, a, smoke);
+    try longPrefix(r, gpa, a, smoke);
+    try longRepeated(r, gpa, a, smoke);
+    try features(r, gpa, smoke);
 }
 
 fn single(r: Report, gpa: Allocator, paths: []const []const u8, smoke: bool) !void {
@@ -198,4 +201,131 @@ fn adversarial(r: Report, gpa: Allocator, a: Allocator, smoke: bool) !void {
         try r.line("adversarial", case.name, "one-shot", one_shot_ns / 1e3, "us");
         try r.line("adversarial", case.name, "compiled", compiled_ns / 1e3, "us");
     }
+}
+
+fn longPrefix(r: Report, gpa: Allocator, a: Allocator, smoke: bool) !void {
+    const text = try a.alloc(u8, 9001);
+    for (text[0..9000], 0..) |*byte, i| byte.* = if (i % 2 == 0) 'a' else 'b';
+    text[9000] = '*';
+    const subject = try a.dupe(u8, text);
+    subject[9000] = 'c';
+    var b: sweep.Set.Builder = .init(gpa);
+    defer b.deinit();
+    _ = try b.add(text, .{});
+    var set = try b.build();
+    defer set.deinit();
+    var best: f64 = std.math.inf(f64);
+    var cold: f64 = std.math.inf(f64);
+    for (0..if (smoke) 1 else 7) |_| {
+        var cache: sweep.Set.Cache = try .init(gpa, &set, .{});
+        defer cache.deinit();
+        const cold_start = r.now();
+        if (!set.any(&cache, subject, .file)) return error.EnginesDisagree;
+        cold = @min(cold, nsBetween(cold_start, r.now()));
+        const start = r.now();
+        const hit = set.any(&cache, subject, .file);
+        const elapsed = nsBetween(start, r.now());
+        if (!hit) return error.EnginesDisagree;
+        best = @min(best, elapsed);
+    }
+    try r.line("long prefix", "9000 units", "set any cold", cold / 1e3, "us/query");
+    try r.line("long prefix", "9000 units", "set any warm", best / 1e3, "us/query");
+}
+
+fn longRepeated(r: Report, gpa: Allocator, a: Allocator, smoke: bool) !void {
+    const text = try a.alloc(u8, 9000);
+    for (text, 0..) |*byte, i| byte.* = "ab*"[i % 3];
+    const subject = try a.alloc(u8, 6000);
+    for (subject, 0..) |*byte, i| byte.* = "ab"[i % 2];
+    var b: sweep.Set.Builder = .init(gpa);
+    defer b.deinit();
+    _ = try b.add(text, .{});
+    var set = try b.build();
+    defer set.deinit();
+    var cold: f64 = std.math.inf(f64);
+    var warm: f64 = std.math.inf(f64);
+    for (0..if (smoke) @as(usize, 1) else 7) |_| {
+        var cache: sweep.Set.Cache = try .init(gpa, &set, .{});
+        defer cache.deinit();
+        var t = r.now();
+        if (!set.any(&cache, subject, .file)) return error.EnginesDisagree;
+        cold = @min(cold, nsBetween(t, r.now()));
+        t = r.now();
+        if (!set.any(&cache, subject, .file)) return error.EnginesDisagree;
+        warm = @min(warm, nsBetween(t, r.now()));
+    }
+    try r.line("long repeats", "ab-star x3000", "set any cold", cold / 1e3, "us/query");
+    try r.line("long repeats", "ab-star x3000", "set any warm", warm / 1e3, "us/query");
+}
+
+fn features(r: Report, gpa: Allocator, smoke: bool) !void {
+    const cases = [_]struct { name: []const u8, text: []const u8, subject: []const u8, options: sweep.Options }{
+        .{ .name = "integer interval", .text = "src/**/v{-1000000..1000000}.c", .subject = "src/lib/v-999999.c", .options = .{ .syntax = .editorconfig } },
+        .{ .name = "regular extglob", .text = "src/+(lib|net)/test_?(io|tcp).zig", .subject = "src/libnet/test_tcp.zig", .options = .{ .syntax = .{ .extglob = true } } },
+        .{ .name = "Unicode folding", .text = "src/[À-Ö]*Σ.c", .subject = "SRC/écoleς.C", .options = .{ .syntax = .glob, .case = .unicode } },
+    };
+    const rounds: usize = if (smoke) 1 else 10_000;
+    for (cases) |case| {
+        var compile_ns: f64 = std.math.inf(f64);
+        var query_ns: f64 = std.math.inf(f64);
+        var p = try sweep.Pattern.compile(gpa, case.text, case.options);
+        defer p.deinit();
+        for (0..7) |_| {
+            var t = r.now();
+            for (0..if (smoke) @as(usize, 1) else 100) |_| {
+                var compiled = try sweep.Pattern.compile(gpa, case.text, case.options);
+                compiled.deinit();
+            }
+            compile_ns = @min(compile_ns, nsBetween(t, r.now()) / (if (smoke) @as(f64, 1) else 100));
+            t = r.now();
+            for (0..rounds) |_| std.mem.doNotOptimizeAway(p.matches(case.subject));
+            query_ns = @min(query_ns, nsBetween(t, r.now()) / @as(f64, @floatFromInt(rounds)));
+        }
+        try r.line("features", case.name, "compile", compile_ns / 1000, "us");
+        try r.line("features", case.name, "matches", query_ns, "ns/query");
+    }
+    var p = try sweep.Pattern.compile(gpa, "src/*/?.{c,h}", .{ .syntax = .glob });
+    defer p.deinit();
+    const t = r.now();
+    var cache = try p.captureCache(gpa);
+    defer cache.deinit();
+    try r.line("features", "capture scratch", "init", nsBetween(t, r.now()) / 1000, "us");
+    var out: [4]?sweep.Pattern.Capture = undefined;
+    var capture_ns: f64 = std.math.inf(f64);
+    for (0..7) |_| {
+        const start = r.now();
+        for (0..rounds) |_| std.mem.doNotOptimizeAway(try p.captures(&cache, "src/lib/é.h", &out));
+        capture_ns = @min(capture_ns, nsBetween(start, r.now()) / @as(f64, @floatFromInt(rounds)));
+    }
+    try r.line("features", "captures", "capture", capture_ns, "ns/query");
+    try walking(r, gpa, smoke);
+}
+
+fn walking(r: Report, gpa: Allocator, smoke: bool) !void {
+    const io = r.io;
+    const root_path = ".zig-cache/sweep-bench-tree";
+    try std.Io.Dir.cwd().createDirPath(io, root_path);
+    defer std.Io.Dir.cwd().deleteTree(io, root_path) catch {};
+    const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
+    defer root.close(io);
+    const count: usize = if (smoke) 10 else 1000;
+    for (0..count) |i| {
+        const directory = try gpa.print("{s}/{d}", .{ if (i % 2 == 0) @as([]const u8, "src") else "other", i % 20 });
+        defer gpa.free(directory);
+        try root.createDirPath(io, directory);
+        const name = try gpa.print("{s}/f{d}.c", .{ directory, i });
+        defer gpa.free(name);
+        try root.writeFile(io, .{ .sub_path = name, .data = "" });
+    }
+    var p = try sweep.Pattern.compile(gpa, "src/**/*.c", .{});
+    defer p.deinit();
+    var best: f64 = std.math.inf(f64);
+    for (0..7) |_| {
+        const t = r.now();
+        var paths = try sweep.expand(gpa, io, root, .{ .pattern = &p }, .{ .files_only = true, .order = .lexical });
+        defer paths.deinit();
+        best = @min(best, nsBetween(t, r.now()));
+        if (paths.items().len != count / 2) return error.MissingPaths;
+    }
+    try r.line("features", "walk 1000 files (half pruned)", "expand", best / 1e6, "ms");
 }

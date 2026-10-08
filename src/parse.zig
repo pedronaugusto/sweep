@@ -1,11 +1,13 @@
 //! The one parser: every dialect, one forward pass, no recursion. Braces
-//! use an explicit stack of open groups; brackets are read by git's own
+//! and extglobs use an explicit stack of open groups; brackets are read by git's own
 //! procedure and turned into a class by the dialect's case rule.
 const std = @import("std");
 const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
 const program = @import("program.zig");
 const class_mod = @import("class.zig");
+const integer = @import("integer.zig");
+const unicode = @import("unicode.zig");
 
 const Builder = program.Builder;
 const Node = program.Node;
@@ -24,6 +26,7 @@ pub const Entry = struct {
 /// caller restores its lengths.
 pub fn parse(b: *Builder, pattern: []const u8, options: syntax.Options, entry: Entry) Error!void {
     var p: Parser = .{ .b = b, .pattern = pattern, .options = options, .reading = .of(options) };
+    if (options.syntax.single_brace_literal and !pairedBraces(pattern, options.syntax)) p.options.syntax.braces = false;
     p.run(entry) catch |err| switch (err) {
         error.Full => return p.tooLong(),
         error.InvalidPattern => return error.InvalidPattern,
@@ -34,7 +37,14 @@ pub fn parse(b: *Builder, pattern: []const u8, options: syntax.Options, entry: E
 /// bracket included: then `anywhere` changes nothing.
 pub fn hasSeparator(pattern: []const u8, sx: syntax.Syntax) bool {
     const sep = sx.separator orelse return true;
-    return std.mem.findScalar(u8, pattern, sep) != null;
+    if (!sx.bracket_separator_literal or sx.brackets == .none) return std.mem.findScalar(u8, pattern, sep) != null;
+    var in_bracket = false;
+    for (pattern) |byte| {
+        if (byte == '[') in_bracket = true;
+        if (byte == ']') in_bracket = false;
+        if (byte == sep and !in_bracket) return true;
+    }
+    return false;
 }
 
 /// What the parser last read, for deciding whether `**` stands as a whole
@@ -68,7 +78,7 @@ const Parser = struct {
         const sx = p.options.syntax;
         // A hidden leading dot makes every wildcard look one unit back.
         if (p.reading.leading_dot) p.b.uses_start = true;
-        if (p.options.anywhere and !hasSeparator(p.pattern, sx)) {
+        if ((p.options.anywhere or sx.basename) and !hasSeparator(p.pattern, sx)) {
             // `**/` before a pattern that can only match one component.
             _ = try p.b.emit(.gstar, 0);
             _ = try p.b.emit(.sep, 0);
@@ -76,11 +86,42 @@ const Parser = struct {
             p.last = .sep;
         }
         const pattern = p.pattern;
-        var i: usize = 0;
+        var i: usize = if (sx.root_slash and pattern.len > 0 and p.reading.isSeparator(pattern[0])) 1 else 0;
         while (i < pattern.len) {
             p.at = i;
             const c = pattern[i];
-            if (sx.escape and c == '\\') {
+            if (sx.extglob and c == '!' and i + 1 < pattern.len and pattern[i + 1] == '(') return p.fail(.unsupported_extglob, i);
+            const literal_bracket = if (c == '[' and sx.brackets != .none and sx.bracket_separator_literal) separatorBracket(pattern, i, sx) else null;
+            const interval = if (c == '{' and sx.numeric_ranges) integer.read(pattern, i) catch return p.fail(.invalid_range, i) else null;
+            const group = ((sx.braces and c == '{') or interval != null) or (sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null);
+            const capture = if (group or c == '*' or c == '?' or (c == '[' and sx.brackets != .none and literal_bracket == null)) try p.startCapture() else null;
+            if (sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null) {
+                const bypass = try p.b.emit(.split, 0);
+                try p.open(i);
+                const frame = &p.b.frames[p.depth - 1];
+                frame.head = bypass;
+                frame.capture = capture;
+                frame.kind = switch (c) {
+                    '?' => .optional,
+                    '*' => .zero_more,
+                    '+' => .one_more,
+                    '@' => .one,
+                    else => unreachable,
+                };
+                i += 2;
+            } else if (sx.extglob and c == '|' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
+                try p.alternative();
+                i += 1;
+            } else if (sx.extglob and c == ')' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
+                const frame = p.b.frames[p.depth - 1];
+                try p.close();
+                if (frame.kind == .zero_more or frame.kind == .one_more) _ = try p.b.emit(.split, @intCast(frame.head + 1));
+                if (frame.kind == .optional or frame.kind == .zero_more) {
+                    p.b.nodes[frame.head].arg = @intCast(p.b.node_len);
+                } else p.b.nodes[frame.head] = .{ .op = .jump, .arg = @intCast(frame.head + 1) };
+                try p.endCapture(frame.capture);
+                i += 1;
+            } else if (sx.escape and c == '\\') {
                 if (i + 1 >= pattern.len) return p.fail(.trailing_escape, i);
                 const u = p.decode(i + 1);
                 if (p.reading.isSeparator(u.code)) {
@@ -97,17 +138,35 @@ const Parser = struct {
                 _ = try p.b.emit(.any, 0);
                 p.last = .other;
                 i += 1;
+            } else if (literal_bracket) |end| {
+                while (i < end) {
+                    const escaped = sx.escape and pattern[i] == '\\' and i + 1 < end;
+                    const u = p.decode(i + @intFromBool(escaped));
+                    if (p.reading.isSeparator(u.code)) {
+                        _ = try p.b.emit(.sep, @intFromBool(escaped));
+                        p.last = .sep;
+                    } else try p.literal(u.code, escaped);
+                    i += u.len + @intFromBool(escaped);
+                }
             } else if (c == '[' and sx.brackets != .none) {
                 i = try p.bracket(i);
+            } else if (interval) |range| {
+                try integer.compile(p.b, range);
+                p.last = .other;
+                try p.endCapture(capture);
+                i = range.end;
             } else if (sx.braces and c == '{') {
                 try p.open(i);
+                p.b.frames[p.depth - 1].capture = capture;
                 i += 1;
-            } else if (sx.braces and c == ',' and p.depth > 0) {
+            } else if (sx.braces and c == ',' and p.depth > 0 and p.b.frames[p.depth - 1].kind == .brace) {
                 try p.alternative();
                 i += 1;
             } else if (sx.braces and c == '}') {
-                if (p.depth == 0) return p.fail(.unmatched_brace, i);
-                p.close();
+                if (p.depth == 0 or p.b.frames[p.depth - 1].kind != .brace) return p.fail(.unmatched_brace, i);
+                const frame = p.b.frames[p.depth - 1];
+                try p.close();
+                try p.endCapture(frame.capture);
                 i += 1;
             } else {
                 const u = p.decode(i);
@@ -117,10 +176,23 @@ const Parser = struct {
                 } else try p.literal(u.code, false);
                 i += u.len;
             }
+            if (!group) try p.endCapture(capture);
         }
         p.at = pattern.len;
-        if (p.depth > 0) return p.fail(.unclosed_brace, p.b.frames[p.depth - 1].offset);
+        if (p.depth > 0) return p.fail(if (p.b.frames[p.depth - 1].kind == .brace) .unclosed_brace else .unclosed_extglob, p.b.frames[p.depth - 1].offset);
         _ = try p.b.emit(.accept, @as(u28, entry.index) << 1 | @intFromBool(entry.dir_only));
+    }
+
+    fn startCapture(p: *Parser) RunError!?u32 {
+        if (!p.b.capture) return null;
+        const id = p.b.capture_count;
+        p.b.capture_count += 1;
+        _ = try p.b.emit(.save, @intCast(2 * id));
+        return id;
+    }
+
+    fn endCapture(p: *Parser, id: ?u32) RunError!void {
+        if (id) |capture| _ = try p.b.emit(.save, @intCast(2 * capture + 1));
     }
 
     fn decode(p: *const Parser, at: usize) unit.Unit {
@@ -131,6 +203,7 @@ const Parser = struct {
         const canon = switch (p.options.case) {
             .sensitive => code,
             .ascii => unit.fold(code),
+            .unicode => unicode.fold(code),
             // git compares an escaped pattern byte unfolded against the
             // folded text, so an escaped capital matches nothing.
             .ascii_git => if (escaped) code else unit.fold(code),
@@ -154,6 +227,11 @@ const Parser = struct {
             return;
         }
         if (sx.globstar == .anywhere) {
+            if (sx.globstar_slash and last == .sep and after < p.pattern.len and p.reading.isSeparator(p.pattern[after])) {
+                _ = try p.b.emit(.gstar, 0);
+                p.b.uses_start = true;
+                return;
+            }
             _ = try p.b.emit(.star, 1);
             return;
         }
@@ -255,7 +333,10 @@ const Parser = struct {
             at += step;
             if (at < pattern.len and pattern[at] == ']') break;
         }
-        const class = filler.finish(negated, p.reading.separator);
+        // Folding letter separators still permits their other case. The
+        // consuming predicate excludes the raw separator independently.
+        const separator = if (p.options.case == .unicode and p.reading.separator != null and (unit.isUpper(p.reading.separator.?) or unit.isLower(p.reading.separator.?))) null else p.reading.separator;
+        const class = filler.finish(negated, separator);
         if (filler.overflow) return error.Full;
         b.classes[b.class_len] = class;
         b.range_len = class.first + class.count;
@@ -275,8 +356,10 @@ const Parser = struct {
     fn open(p: *Parser, i: usize) RunError!void {
         const b = p.b;
         if (p.depth >= b.frames.len) return error.Full;
+        const head = b.node_len;
+        if (p.options.syntax.single_brace_literal and p.pattern[i] == '{') _ = try b.emit(.lit, '{');
         const split = try b.emit(.split, 0);
-        b.frames[p.depth] = .{ .split = split, .jumps = program.no_jump, .offset = @intCast(i) };
+        b.frames[p.depth] = .{ .split = split, .jumps = program.no_jump, .offset = @intCast(i), .head = @intCast(head) };
         p.depth += 1;
         p.last = .open;
     }
@@ -284,6 +367,7 @@ const Parser = struct {
     fn alternative(p: *Parser) RunError!void {
         const b = p.b;
         const frame = &b.frames[p.depth - 1];
+        if (frame.kind == .brace and p.options.syntax.single_brace_literal) b.nodes[frame.head] = .{ .op = .jump, .arg = @intCast(frame.head + 1) };
         const jump = try b.emit(.jump, @intCast(frame.jumps));
         frame.jumps = jump;
         b.nodes[frame.split].arg = @intCast(b.node_len);
@@ -291,9 +375,10 @@ const Parser = struct {
         p.last = .open;
     }
 
-    fn close(p: *Parser) void {
+    fn close(p: *Parser) RunError!void {
         const b = p.b;
         const frame = b.frames[p.depth - 1];
+        if (frame.kind == .brace and frame.jumps == program.no_jump and p.options.syntax.single_brace_literal) _ = try b.emit(.lit, '}');
         // The last alternative needs no split: it falls through.
         b.nodes[frame.split] = .{ .op = .jump, .arg = @intCast(frame.split + 1) };
         var jump = frame.jumps;
@@ -316,3 +401,37 @@ const Parser = struct {
         return error.InvalidPattern;
     }
 };
+
+// EditorConfig treats an unescaped slash inside a bracket literally, even
+// when the bracket has no closing delimiter.
+fn separatorBracket(text: []const u8, open: usize, sx: syntax.Syntax) ?usize {
+    const sep = sx.separator orelse return null;
+    var i = open + 1;
+    var found = false;
+    while (i < text.len) : (i += 1) {
+        if (sx.escape and text[i] == '\\' and i + 1 < text.len) {
+            i += 1;
+            continue;
+        }
+        if (text[i] == ']') return if (found) i + 1 else null;
+        if (text[i] == sep) found = true;
+    }
+    return if (found) text.len else null;
+}
+
+fn pairedBraces(text: []const u8, sx: syntax.Syntax) bool {
+    var depth: usize = 0;
+    var at: usize = 0;
+    while (at < text.len) : (at += 1) {
+        if (sx.escape and text[at] == '\\' and at + 1 < text.len) {
+            at += 1;
+            continue;
+        }
+        if (text[at] == '{') depth += 1;
+        if (text[at] == '}') {
+            if (depth == 0) return false;
+            depth -= 1;
+        }
+    }
+    return depth == 0;
+}

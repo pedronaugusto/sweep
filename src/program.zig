@@ -1,6 +1,6 @@
 //! The automaton a pattern compiles to: a Thompson NFA over units whose
-//! epsilon edges all point forwards, so one sweep in index order closes a
-//! set of threads.
+//! ordinary epsilon edges point forwards. Extglob repetition adds cycles;
+//! visited contexts close each thread once per subject position.
 //!
 //! A thread carries one of three contexts, which say what the last pattern
 //! item it passed was: a separator, something else, or a globstar whose
@@ -9,6 +9,7 @@
 //! alternative means what it would mean written out in full.
 const std = @import("std");
 const unit = @import("unit.zig");
+const unicode = @import("unicode.zig");
 const syntax = @import("syntax.zig");
 const class_mod = @import("class.zig");
 
@@ -46,6 +47,8 @@ pub const Op = enum(u4) {
     jump,
     /// The pattern matched: entry `arg >> 1`, directory-only when `arg & 1`.
     accept,
+    /// Capture offset `arg`, used only by the on-demand tagged pass.
+    save,
 };
 
 /// One node: an operation and its operand.
@@ -75,26 +78,29 @@ pub const Reading = struct {
     separator: ?unit.Code,
     /// Subject units fold A-Z to a-z before they are compared.
     fold: bool,
+    /// Unicode simple folding rather than ASCII folding.
+    unicode: bool,
     /// A leading `.` is hidden from wildcards.
     leading_dot: bool,
 
     pub fn of(options: syntax.Options) Reading {
-        const utf8 = options.syntax.unit == .utf8;
+        const utf8 = options.syntax.unit == .utf8 or options.case == .unicode;
         return .{
             .utf8 = utf8,
             .separator = if (options.syntax.separator) |s| unit.separatorCode(utf8, s) else null,
             .fold = options.case != .sensitive,
+            .unicode = options.case == .unicode,
             .leading_dot = options.syntax.leading_dot == .explicit,
         };
     }
 
     pub fn eql(a: Reading, b: Reading) bool {
-        return a.utf8 == b.utf8 and a.separator == b.separator and a.fold == b.fold and a.leading_dot == b.leading_dot;
+        return a.utf8 == b.utf8 and a.separator == b.separator and a.fold == b.fold and a.unicode == b.unicode and a.leading_dot == b.leading_dot;
     }
 
     /// The code a subject unit is compared by.
     pub fn canonical(r: Reading, code: unit.Code) unit.Code {
-        return if (r.fold) unit.fold(code) else code;
+        return if (r.unicode) unicode.fold(code) else if (r.fold) unit.fold(code) else code;
     }
 
     pub fn isSeparator(r: Reading, code: unit.Code) bool {
@@ -129,10 +135,10 @@ pub const Program = struct {
             .dot_plain => code == '.' and !hidden,
             .sep => r.isSeparator(code),
             .any => !r.isSeparator(code) and !hidden,
-            .class => !hidden and p.classes[node.arg].contains(p.ranges, r.canonical(code)),
+            .class => !r.isSeparator(code) and !hidden and p.classes[node.arg].contains(p.ranges, r.canonical(code)),
             .star => (node.arg == 1 or !r.isSeparator(code)) and !hidden,
             .gstar => !hidden,
-            .split, .jump, .accept => false,
+            .split, .jump, .save, .accept => false,
         };
     }
 };
@@ -146,6 +152,10 @@ pub const Frame = struct {
     jumps: u32,
     /// Where the `{` is, for a diagnostic.
     offset: u32,
+    /// First node and repetition rule of this group.
+    head: u32 = 0,
+    kind: enum { brace, one, optional, zero_more, one_more } = .brace,
+    capture: ?u32 = null,
 };
 
 pub const no_jump: u32 = Node.max_arg;
@@ -160,6 +170,9 @@ pub const Builder = struct {
     class_len: usize = 0,
     range_len: usize = 0,
     uses_start: bool = false,
+    /// Emit capture tags only for a capture-cache build.
+    capture: bool = false,
+    capture_count: u32 = 0,
 
     pub const Full = error{Full};
 
@@ -188,22 +201,27 @@ pub const Bounds = struct {
     ranges: usize,
     frames: usize,
 
-    pub fn of(pattern: []const u8) Bounds {
+    pub fn of(pattern: []const u8, options: syntax.Options) Bounds {
+        const sx = options.syntax;
         var brackets: usize = 0;
         var braces: usize = 0;
         for (pattern) |c| switch (c) {
             '[' => brackets += 1,
-            '{' => braces += 1,
+            '{', '(' => braces += 1,
             else => {},
         };
+        const numeric = if (sx.numeric_ranges) braces else 0;
         return .{
             // Two nodes a unit at most (`,` and a hidden-dot `.`), the
             // `anywhere` prefix and the accept.
-            .nodes = 2 * pattern.len + 4,
-            .classes = brackets,
+            .nodes = 2 * pattern.len + 4 + numeric * 2048,
+            // The interval compiler interns the 45 non-singleton digit ranges.
+            .classes = brackets + numeric * 45,
             // A member adds at most one range, a negation one more, and
             // taking out the separator one more.
-            .ranges = pattern.len + 2 * brackets,
+            // Only source brackets need Unicode images; generated decimal
+            // classes contain ASCII digits, whose fold is the identity.
+            .ranges = pattern.len + 2 * brackets + (if (options.case == .unicode) brackets * 1700 else 0),
             .frames = braces,
         };
     }

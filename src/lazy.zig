@@ -29,7 +29,7 @@ pub const Automaton = struct {
         var count: usize = 0;
         for (entries) |e| {
             if (!e.reading.eql(reading) or e.strategy != null) continue;
-            const bounds: program_mod.Bounds = .of(e.pattern);
+            const bounds: program_mod.Bounds = .of(e.pattern, e.entry.options);
             total.nodes += bounds.nodes + 1;
             total.classes += bounds.classes;
             total.ranges += bounds.ranges;
@@ -167,7 +167,7 @@ pub const Cache = struct {
         errdefer c.deinit(gpa);
         c.states = try gpa.alloc(State, max_states);
         c.slots = try gpa.alloc(u32, slot_count);
-        c.scratch = try gpa.alloc(u64, 4 * nfa.words(nodes));
+        c.scratch = try gpa.alloc(u64, 7 * nfa.words(nodes));
         c.buf = try gpa.alloc(u32, nodes);
         c.clear();
         c.stats.clears = 0;
@@ -193,6 +193,7 @@ pub const Cache = struct {
         return .init(c.automaton.program(), c.automaton.live, .{
             .reach = .{ w[0..n], w[n .. 2 * n], w[2 * n .. 3 * n] },
             .kernel = w[3 * n .. 4 * n],
+            .seen = .{ w[4 * n .. 5 * n], w[5 * n .. 6 * n], w[6 * n .. 7 * n] },
         });
     }
 
@@ -382,6 +383,7 @@ const Run = struct {
         var sim: nfa.Sim = .init(r.automaton.program(), .{
             .reach = .{ w[0..n], w[n .. 2 * n], w[2 * n .. 3 * n] },
             .kernel = w[3 * n .. 4 * n],
+            .seen = .{ w[4 * n .. 5 * n], w[5 * n .. 6 * n], w[6 * n .. 7 * n] },
         });
         for (sim.reach) |reach| @memset(reach, 0);
         @memset(sim.kernel, 0);

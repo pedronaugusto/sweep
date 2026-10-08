@@ -148,7 +148,7 @@ test "base is the literal directory a walk starts from" {
     }
 }
 
-test "literal patterns take a strategy, the rest a DFA" {
+test "literal patterns take a strategy, plain ones direct execution, the rest a DFA" {
     const cases = [_]struct { pattern: []const u8, options: sweep.Options = .{}, strategy: bool }{
         .{ .pattern = "src/main.zig", .strategy = true },
         .{ .pattern = "*.zig", .options = .{ .anywhere = true }, .strategy = true },
@@ -164,7 +164,7 @@ test "literal patterns take a strategy, the rest a DFA" {
         var p: Pattern = try .compile(gpa, case.pattern, case.options);
         defer p.deinit();
         try std.testing.expectEqual(case.strategy, p.strategy != null);
-        if (!case.strategy) try std.testing.expect(p.eager != null);
+        if (!case.strategy) try std.testing.expect(p.direct != null or p.eager != null);
     }
     var p: Pattern = try .compile(gpa, "src/**/test_*.zig", .{});
     defer p.deinit();

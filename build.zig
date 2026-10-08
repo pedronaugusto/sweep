@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) !void {
     examples.dependOn(&b.addRunArtifact(example).step);
     test_step.dependOn(examples);
     check.dependOn(&example.step);
-    // No OS calls: the whole package builds for a target with no OS at all.
+    // The matching and capture APIs also build for a target with no OS.
     const freestanding = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     const object = b.addObject(.{
         .name = "sweep-freestanding",
@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) !void {
             .imports = &.{.{ .name = "sweep", .module = b.createModule(.{ .root_source_file = b.path("src/sweep.zig"), .target = freestanding, .optimize = .small }) }},
         }),
     });
-    b.step("check-freestanding", "Build every public call for wasm32-freestanding").dependOn(&object.step);
+    b.step("check-freestanding", "Build pure public calls for wasm32-freestanding").dependOn(&object.step);
     b.getInstallStep().dependOn(&tests.step);
     b.getInstallStep().dependOn(&example.step);
     // The test doubles are shakedown's, a lazy dependency only the tests
@@ -68,6 +68,23 @@ pub fn build(b: *std.Build) !void {
         // A project that depends on sweep by path, with no packages to
         // fetch: the build a consumer gets.
         preflight.addConsumerCheck(b, .{ .package = "sweep", .program = b.path("ci/consumer.zig") });
+        const dep = try b.dependencyLazy("preflight", .{});
+        const host = b.graph.host;
+        const gantry = try dep.builder.dependencyLazy("gantry", .{ .target = host, .optimize = .debug });
+        const cli = b.addExecutable(.{
+            .name = "preflight-plan",
+            .root_module = b.createModule(.{
+                .root_source_file = dep.path("src/main.zig"),
+                .target = host,
+                .optimize = .safe,
+                .imports = &.{.{ .name = "gantry", .module = gantry.module("gantry") }},
+            }),
+        });
+        const plan = b.addRunArtifact(cli);
+        plan.addArg("plan");
+        plan.addPassthruArgs();
+        plan.setCwd(b.path("."));
+        b.step("plan", "Print the hosted CI plan").dependOn(&plan.step);
     }
     return needed;
 }

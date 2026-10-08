@@ -21,7 +21,8 @@ pub fn hashable(s: Strategy, reading: Reading) bool {
         .tail => lit.len > 0 and lit[lit.len - 1] != sep_byte,
         .ends => lit.len > 1 and lit[0] == '.' and std.mem.findAny(u8, lit[1..], &.{ '.', sep_byte }) == null,
         .starts => lit.len > 0 and lit[lit.len - 1] == sep_byte,
-        .starts_component => false,
+        .starts_component => true,
+        .basename_starts => false,
     };
 }
 
@@ -147,6 +148,9 @@ pub const Strategies = struct {
     extension: Table = .{},
     /// A prefix ending in a separator.
     prefix: Table = .{},
+    /// Prefixes whose remainder cannot contain a separator.
+    component_prefix: Table = .{},
+    component_sorted: [][]const u8 = &.{},
     /// The last few components.
     suffixes: []Suffixes = &.{},
     /// Exact keys and prefix keys, sorted, for `leadsTo`.
@@ -162,6 +166,8 @@ pub const Strategies = struct {
         defer basename.deinit(gpa);
         var extension: std.ArrayList(Table.Pair) = .empty;
         defer extension.deinit(gpa);
+        var component: std.ArrayList(Table.Pair) = .empty;
+        defer component.deinit(gpa);
         var prefix: std.ArrayList(Table.Pair) = .empty;
         defer prefix.deinit(gpa);
         var suffix: std.ArrayList(struct { components: usize, pair: Table.Pair }) = .empty;
@@ -178,13 +184,16 @@ pub const Strategies = struct {
                     const seps = std.mem.countScalar(u8, strategy.literal, strategy_mod.separatorByte(reading));
                     if (seps == 0) try basename.append(gpa, pair) else try suffix.append(gpa, .{ .components = seps + 1, .pair = pair });
                 },
-                .starts_component => unreachable,
+                .starts_component => try component.append(gpa, pair),
+                .basename_starts => unreachable,
             }
         }
         s.exact = try .build(gpa, reading, exact.items);
         s.basename = try .build(gpa, reading, basename.items);
         s.extension = try .build(gpa, reading, extension.items);
         s.prefix = try .build(gpa, reading, prefix.items);
+        s.component_prefix = try .build(gpa, reading, component.items);
+        s.component_sorted = try sortedKeys(gpa, s.component_prefix);
         // Suffixes grouped by their length in components.
         std.mem.sortUnstable(@TypeOf(suffix.items[0]), suffix.items, {}, struct {
             fn less(_: void, a: @TypeOf(suffix.items[0]), b: @TypeOf(suffix.items[0])) bool {
@@ -216,6 +225,8 @@ pub const Strategies = struct {
         s.basename.deinit(gpa);
         s.extension.deinit(gpa);
         s.prefix.deinit(gpa);
+        s.component_prefix.deinit(gpa);
+        gpa.free(s.component_sorted);
         for (s.suffixes) |*g| g.table.deinit(gpa);
         gpa.free(s.suffixes);
         gpa.free(s.exact_sorted);
@@ -225,8 +236,18 @@ pub const Strategies = struct {
 
     /// Offers every entry a strategy matches for the whole `subject`.
     pub fn visit(s: *const Strategies, subject: []const u8, reading: Reading, acc: anytype) void {
+        if (s.component_sorted.len == 1 and s.exact.isEmpty() and s.basename.isEmpty() and s.extension.isEmpty() and s.prefix.isEmpty() and s.suffixes.len == 0) {
+            const key = s.component_sorted[0];
+            if (subject.len < key.len or !strategy_mod.eql(reading, subject[0..key.len], key)) return;
+            if (reading.separator != null and std.mem.findScalar(u8, subject[key.len..], strategy_mod.separatorByte(reading)) != null) return;
+            for (s.component_prefix.slots) |slot| if (slot.run != Table.empty_run) {
+                acc.offerRun(s.component_prefix.runs[slot.run..][0..slot.run_len]);
+                return;
+            };
+            unreachable; // unreachable: one sorted key came from one occupied slot
+        }
         var probe: Probe = .{};
-        probe.feed(s, subject, subject.len, reading, acc);
+        probe.feed(s, subject, subject.len, reading, acc, acc);
         probe.finish(s, subject, subject.len, reading, acc);
     }
 
@@ -237,6 +258,7 @@ pub const Strategies = struct {
         const sep: ?u8 = if (reading.separator != null and dir.len > 0) strategy_mod.separatorByte(reading) else null;
         if (startsWithAny(s.exact_sorted, reading, dir, sep)) return true;
         if (startsWithAny(s.prefix_sorted, reading, dir, sep)) return true;
+        if (startsWithAny(s.component_sorted, reading, dir, sep)) return true;
         const sep_byte = sep orelse return false;
         // A prefix key that `dir` and its separator start with.
         var h: u64 = 0;
@@ -322,12 +344,16 @@ pub const Probe = struct {
 
     /// Rolls the hashes over `subject[at..to]`, offering prefix entries at
     /// each separator.
-    pub fn feed(p: *Probe, s: *const Strategies, subject: []const u8, to: usize, reading: Reading, acc: anytype) void {
+    pub fn feed(p: *Probe, s: *const Strategies, subject: []const u8, to: usize, reading: Reading, acc: anytype, component_acc: anytype) void {
         const sep: ?u8 = if (reading.separator) |_| strategy_mod.separatorByte(reading) else null;
+        const last_sep = if (!s.component_prefix.isEmpty()) (if (sep) |c| std.mem.findScalarLast(u8, subject[0..to], c) else null) else null;
+        if (p.at == 0 and last_sep == null) if (s.component_prefix.find(reading, 0, "")) |run| component_acc.offerRun(run);
         while (p.at < to) : (p.at += 1) {
             const b = subject[p.at];
             const c = canonical(reading, b);
             p.full = roll(p.full, c);
+            if (!s.component_prefix.isEmpty() and (last_sep == null or p.at >= last_sep.?))
+                if (s.component_prefix.find(reading, p.full, subject[0 .. p.at + 1])) |run| component_acc.offerRun(run);
             if (sep != null and b == sep.?) {
                 if (s.prefix.find(reading, p.full, subject[0 .. p.at + 1])) |run| acc.offerRun(run);
                 p.component = 0;

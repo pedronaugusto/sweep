@@ -11,9 +11,11 @@ const Syntax = syntax.Syntax;
 pub fn isSpecial(byte: u8, sx: Syntax) bool {
     return switch (byte) {
         '*', '?' => true,
+        '!', '@', '+', '(', ')', '|' => sx.extglob,
         '[' => sx.brackets != .none,
         '\\' => sx.escape,
-        '{', '}', ',' => sx.braces,
+        '{', '}' => sx.braces or sx.numeric_ranges,
+        ',' => sx.braces,
         else => false,
     };
 }

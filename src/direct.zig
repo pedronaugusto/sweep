@@ -69,7 +69,7 @@ pub const Room = struct {
 /// pattern that fits `room`.
 pub inline fn match(pattern: []const u8, subject: []const u8, options: syntax.Options, room: Room) Outcome {
     const sx = options.syntax;
-    if (sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return .automaton;
+    if (options.case == .unicode or sx.root_slash or sx.basename or sx.bracket_separator_literal or sx.extglob or sx.numeric_ranges or sx.unit != .byte or sx.leading_dot != .ordinary or sx.globstar == .anywhere) return .automaton;
     // A byte is a unit here.
     if (pattern.len > room.units) return .automaton;
     var roles: u8 = Role.star | Role.any;
@@ -81,24 +81,74 @@ pub inline fn match(pattern: []const u8, subject: []const u8, options: syntax.Op
     // more than the room.
     if (roles & Role.bracket != 0 and pattern.len > 3 * room.brackets and moreBrackets(pattern, roles, room.brackets)) return .automaton;
     const fold = options.case != .sensitive;
+    // Alphabetic bytes are literals in every supported direct dialect.
+    // Most anchored paths fail here, before pathname setup or a role lookup.
+    var start: usize = 0;
+    if (!options.anywhere and pattern.len > 0 and pattern[0] >= 'a' and pattern[0] <= 'z') {
+        if (subject.len == 0 or (if (fold) !same(true, pattern[0], subject[0]) else pattern[0] != subject[0])) {
+            if (Needles.of(roles)) |needles| if (needles.anyIn(pattern[1..])) return settleRest(pattern[1..], roles);
+            return .no;
+        }
+        start = 1;
+        if (!fold and roles & Needles.checked == Role.bracket | Role.escape and pattern.len >= 8) {
+            const word = std.mem.readInt(u64, pattern[0..8], .little);
+            if (!Needles.prefix.inWord(word)) {
+                if (subject.len < 8 or word != std.mem.readInt(u64, subject[0..8], .little)) return settle(pattern, 8, roles);
+                start = 8;
+            }
+        }
+    }
     if (sx.separator) |separator| {
         if (separator != '/') return .automaton;
         roles |= Role.separator;
         if (sx.globstar == .component) roles |= Role.globstar;
-        return if (fold) path(true, pattern, subject, roles, options.anywhere) else path(false, pattern, subject, roles, options.anywhere);
+        return if (fold) path(true, pattern, subject, roles, options.anywhere, start) else path(false, pattern, subject, roles, options.anywhere, start);
     }
     return if (fold) read(true, false, pattern, subject, roles) else read(false, false, pattern, subject, roles);
 }
 
+/// Whether the direct executor can decide this complete, validated pattern.
+pub noinline fn supports(pattern: []const u8, options: syntax.Options, room: Room) bool {
+    if (options.syntax.separator) |separator| if (separator != '/') return false;
+    var subject: []const u8 = "";
+    _ = &subject;
+    return match(pattern, subject, options, room) != .automaton;
+}
+
+/// Validated plain-pattern execution. Compilation has checked the whole
+/// pattern, so a mismatch needs no scan for malformed unread syntax.
+pub const Compiled = struct {
+    roles: u8,
+    fold: bool,
+    separated: bool,
+    anywhere: bool,
+
+    pub fn init(pattern: []const u8, options: syntax.Options, brackets: usize, room: Room) ?Compiled {
+        if (!supports(pattern, options, room)) return null;
+        var roles: u8 = Role.star | Role.any;
+        if (brackets > 0) roles |= Role.bracket | Role.read_brackets;
+        if (options.syntax.separator != null) roles |= Role.separator;
+        if (options.syntax.globstar == .component) roles |= Role.globstar;
+        return .{ .roles = roles, .fold = options.case != .sensitive, .separated = options.syntax.separator != null, .anywhere = options.anywhere };
+    }
+
+    pub fn matches(c: Compiled, pattern: []const u8, subject: []const u8) bool {
+        return (if (c.separated)
+            (if (c.fold) path(true, pattern, subject, c.roles, c.anywhere, 0) else path(false, pattern, subject, c.roles, c.anywhere, 0))
+        else
+            (if (c.fold) read(true, false, pattern, subject, c.roles) else read(false, false, pattern, subject, c.roles))) == .yes;
+    }
+};
+
 /// A pattern of paths. One with no separator matches the last component
 /// when `anywhere` is set, and so does one after a leading `**/`.
-fn path(comptime fold: bool, pattern: []const u8, subject: []const u8, roles: u8, anywhere: bool) Outcome {
-    if (roles & Role.globstar != 0 and std.mem.startsWith(u8, pattern, "**/")) {
+fn path(comptime fold: bool, pattern: []const u8, subject: []const u8, roles: u8, anywhere: bool, start: usize) Outcome {
+    if (start == 0 and roles & Role.globstar != 0 and std.mem.startsWith(u8, pattern, "**/")) {
         if (std.mem.findScalarPos(u8, pattern, 3, '/') == null) return last(fold, pattern[3..], subject, roles);
     } else if (anywhere and std.mem.findScalar(u8, pattern, '/') == null) {
         return last(fold, pattern, subject, roles);
     }
-    return read(fold, true, pattern, subject, roles);
+    return readFrom(fold, true, pattern, subject, roles, start);
 }
 
 /// `pattern`, which holds no separator, against the last component of
@@ -124,10 +174,14 @@ fn last(comptime fold: bool, pattern: []const u8, subject: []const u8, roles: u8
 /// with a role. With `separated` false it reads text: wildcards take any
 /// byte.
 inline fn read(comptime fold: bool, comptime separated: bool, pattern: []const u8, subject: []const u8, roles: u8) Outcome {
-    var i: usize = 0;
+    return readFrom(fold, separated, pattern, subject, roles, 0);
+}
+
+inline fn readFrom(comptime fold: bool, comptime separated: bool, pattern: []const u8, subject: []const u8, roles: u8, start: usize) Outcome {
+    var i = start;
     while (i < pattern.len) : (i += 1) {
         const c = pattern[i];
-        if (Role.of[c] & roles != 0) return run(fold, separated, pattern, subject, roles, i);
+        if (Role.of[c] & (roles & ~Role.separator) != 0) return run(fold, separated, pattern, subject, roles, i);
         if (i == subject.len or !same(fold, c, subject[i])) return settle(pattern, i, roles);
     }
     return if (i == subject.len) .yes else .no;
@@ -186,6 +240,7 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
         deep: Slashes = undefined,
         /// The pattern before `seen` has been read and is this executor's.
         seen: usize,
+        component_end: usize = none,
 
         const Self = @This();
 
@@ -225,7 +280,7 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
             }
             // The star never takes a separator: it ends where the
             // subject's component does.
-            const end = if (separated) Slashes.first(r.subject, r.s) orelse r.subject.len else r.subject.len;
+            const end = if (separated) r.componentEnd() else r.subject.len;
             if (q == pattern.len or (separated and pattern[q] == '/')) {
                 // Nothing follows in the component: the star takes the rest.
                 r.p = q;
@@ -244,6 +299,13 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
             r.p = segment.end;
             r.s = at + segment.units;
             return .next;
+        }
+
+        fn componentEnd(r: *Self) usize {
+            if (r.component_end == none or r.s > r.component_end) {
+                r.component_end = Slashes.first(r.subject, r.s) orelse r.subject.len;
+            }
+            return r.component_end;
         }
 
         /// The first place at or after `s` where `segment` matches, ending
@@ -314,6 +376,7 @@ fn Reader(comptime fold: bool, comptime separated: bool) type {
                 if (!literal or (start < r.subject.len and same(fold, lead, r.subject[start]))) {
                     r.p = r.deep_p;
                     r.s = start;
+                    r.component_end = none;
                     return true;
                 }
             }
@@ -386,6 +449,7 @@ const Needles = struct {
 
     const ones: u64 = 0x0101_0101_0101_0101;
     const highs: u64 = 0x8080_8080_8080_8080;
+    const prefix: Needles = .{ .words = .{ ones * '*', ones * '?', ones * '[', ones * '\\' } };
 
     /// The roles whose bytes are needles, three bits in a row.
     const checked = Role.bracket | Role.escape | Role.brace;

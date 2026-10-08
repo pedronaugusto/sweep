@@ -1,5 +1,9 @@
 test {
     _ = @import("unit.zig");
+    _ = @import("testing/complete_test.zig");
+    _ = @import("testing/complete_property_test.zig");
+    _ = @import("testing/performance_test.zig");
+    _ = @import("testing/walk_test.zig");
     _ = @import("class.zig");
     _ = @import("helpers.zig");
     _ = @import("match.zig");

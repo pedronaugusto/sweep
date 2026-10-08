@@ -1,6 +1,6 @@
-//! sweep has no OS calls: this object builds for wasm32-freestanding in
+//! The pure matching and capture APIs build for wasm32-freestanding in
 //! `zig build check-freestanding`, and its exports reach every public
-//! query, so the whole package is analysed for a target with no OS.
+//! query, while filesystem expansion stays in its optional Io layer.
 const std = @import("std");
 const sweep = @import("sweep");
 
@@ -72,4 +72,15 @@ export fn sweepLiteralPrefix(pattern: [*]const u8, pattern_len: usize) usize {
 /// Whether a byte has meaning outside brackets in git's dialect.
 export fn sweepIsSpecial(byte: u8) bool {
     return sweep.isSpecial(byte, .git);
+}
+
+/// Unicode folding, regular groups and captures also require no OS.
+export fn sweepCaptures(subject: [*]const u8, subject_len: usize) i32 {
+    var fixed: std.heap.FixedBufferAllocator = .init(&heap);
+    var p = sweep.Pattern.compile(fixed.allocator(), "+(Σ|K)*", .{ .syntax = .{ .extglob = true }, .case = .unicode }) catch return -1;
+    defer p.deinit();
+    var cache = p.captureCache(fixed.allocator()) catch return -1;
+    defer cache.deinit();
+    var out: [4]?sweep.Pattern.Capture = undefined;
+    return @intFromBool(p.captures(&cache, subject[0..subject_len], &out) catch return -1);
 }

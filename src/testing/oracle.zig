@@ -238,6 +238,7 @@ fn membersMatch(b: Bracket, code: Code, git_fold: bool) bool {
 
 fn bracketHas(b: Bracket, code: Code, case: sweep.Case) bool {
     const positive = switch (case) {
+        .unicode => unreachable,
         .sensitive => membersMatch(b, code, false),
         .ascii => membersMatch(b, code, false) or membersMatch(b, swap(code), false),
         // git folds the text and compares members unfolded.
@@ -294,6 +295,7 @@ const Matcher = struct {
 
     fn litMatches(m: *const Matcher, code: Code, escaped: bool, text: Code) bool {
         return switch (m.options.case) {
+            .unicode => unreachable,
             .sensitive => code == text,
             .ascii => lower(code) == lower(text),
             .ascii_git => (if (escaped) code else lower(code)) == lower(text),

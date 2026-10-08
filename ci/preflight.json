@@ -34,6 +34,13 @@
       "imports": [
         "sweep"
       ]
+    },
+    "zig build docs -- walk": {
+      "source": "examples/usage.zig",
+      "region": "walk",
+      "imports": [
+        "sweep"
+      ]
     }
   },
   "ziglint_exceptions": "ci/ziglint-exceptions.json",
@@ -50,6 +57,5 @@
     ]
   ],
   "unreachable_exceptions": "ci/unreachable-exceptions.json",
-  "debug_print_exceptions": "ci/debug-print-exceptions.json",
-  "file_name_exceptions": "ci/file-name-exceptions.json"
+  "debug_print_exceptions": "ci/debug-print-exceptions.json"
 }

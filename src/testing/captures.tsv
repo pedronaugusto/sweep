@@ -1,0 +1,45 @@
+lib/*/*.c	src/.lib/y.c	<false>
+*/foo/*	a.b	<false>
+src/*/*.[ch]	src/lib/x.h	lib|x|h
+src/*/*.[ch]	lib/a/foo.c	<false>
+*.*	foo/foo/bar	<false>
+lib/*/*.c	aXb123c	<false>
+lib/*/*.c	main.c	<false>
+lib/*/*.c	no	<false>
+a*b*c	no	<false>
+*/foo/*	foo/foo/bar	foo|bar
+lib/*/*.c	foo/foo/bar	<false>
+lib/*/*.c	lib/a/foo.c	a|foo
+lib/*/*.c		<false>
+a*b*c	main.c	<false>
+*.*	a.b	a|b
+*/foo/*		<false>
+a*b*c	foo/foo/bar	<false>
+*/foo/*	src/lib/x.h	<false>
+*.*	aXb123c	<false>
+*.*		<false>
+*.*	lib/a/foo.c	<false>
+a*b*c	src/lib/x.h	<false>
+*.*	no	<false>
+src/*/*.[ch]	aXb123c	<false>
+*.*	src/.lib/y.c	<false>
+a*b*c	a.b	<false>
+*/foo/*	main.c	<false>
+a*b*c		<false>
+a*b*c	src/.lib/y.c	<false>
+*/foo/*	src/.lib/y.c	<false>
+*.*	main.c	main|c
+src/*/*.[ch]	foo/foo/bar	<false>
+*.*	src/lib/x.h	<false>
+a*b*c	aXb123c	X|123
+*/foo/*	no	<false>
+*/foo/*	aXb123c	<false>
+*/foo/*	lib/a/foo.c	<false>
+src/*/*.[ch]		<false>
+a*b*c	lib/a/foo.c	<false>
+src/*/*.[ch]	no	<false>
+src/*/*.[ch]	main.c	<false>
+src/*/*.[ch]	a.b	<false>
+lib/*/*.c	src/lib/x.h	<false>
+src/*/*.[ch]	src/.lib/y.c	.lib|y|c
+lib/*/*.c	a.b	<false>

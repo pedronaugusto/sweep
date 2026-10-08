@@ -37,12 +37,13 @@ pub const Storage = struct {
     ranges: [inline_ranges]program.Range,
     frames: [inline_depth]program.Frame,
     reach: [3][max_words]u64,
+    seen: [3][max_words]u64,
     kernel: [max_words]u64,
 };
 
 /// Whether `pattern` matches all of `subject`. Allocates nothing: a plain
 /// pattern is read straight from its text, and any other is built on about
-/// 16 KiB of stack (`@sizeOf(Storage)`). Takes patterns up to
+/// 24 KiB of stack (`@sizeOf(Storage)`). Takes patterns up to
 /// `inline_units` units with up to `inline_classes` brackets, whichever
 /// reader would take them; longer is `error.PatternTooLong`, and a compiled
 /// `Pattern` takes it. Cost: O(len(pattern) + len(subject) × states).
@@ -72,12 +73,12 @@ noinline fn general(pattern: []const u8, subject: []const u8, options: syntax.Op
 /// Whether a pattern of more than `inline_units` bytes is more than that many
 /// units, filling the diagnostic when it is.
 noinline fn tooLong(pattern: []const u8, options: syntax.Options) bool {
-    if (unit.count(options.syntax.unit == .utf8, pattern) <= inline_units) return false;
+    if (unit.count(options.syntax.unit == .utf8 or options.case == .unicode, pattern) <= inline_units) return false;
     if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
     return true;
 }
 
-/// `match` by parse and simulation. Its own frame: the 16 KiB of storage is
+/// `match` by parse and simulation. Its own frame: the 24 KiB of storage is
 /// set up only for a pattern the direct executor does not take.
 noinline fn automaton(pattern: []const u8, subject: []const u8, options: syntax.Options) syntax.PatternError!bool {
     var storage: Storage = undefined;
@@ -108,10 +109,11 @@ noinline fn automaton(pattern: []const u8, subject: []const u8, options: syntax.
     var sim: nfa.Sim = .init(p, .{
         .reach = .{ storage.reach[0][0..n], storage.reach[1][0..n], storage.reach[2][0..n] },
         .kernel = storage.kernel[0..n],
+        .seen = .{ storage.seen[0][0..n], storage.seen[1][0..n], storage.seen[2][0..n] },
     });
     return sim.run(subject);
 }
 
-test "the inline storage stays near 16 KiB" {
-    try std.testing.expect(@sizeOf(Storage) <= 17 * 1024);
+test "the inline storage stays near 24 KiB" {
+    try std.testing.expect(@sizeOf(Storage) <= 24 * 1024);
 }
