@@ -189,9 +189,17 @@ and `[A]` match nothing while `[A-Z]` matches `q`.
 
 `Case.unicode` uses Unicode 18.0.0 default simple case folding: literals, escaped
 literals and bracket ranges compare by one canonical scalar. It implies UTF-8
-units. It does not normalize, expand `ß` to `ss`, or apply Turkic mappings.
+units. Folding alone does not normalize, expand `ß` to `ss`, or apply Turkic
+mappings.
 Invalid UTF-8 bytes remain distinct. The committed table is generated with
 `zig run tools/casefold.zig > src/fold.zig`; consumers build no generator.
+
+`Options.normalization = .nfc` composes pattern literals and names after parsing
+syntax. `[é]` matches composed or decomposed é, never plain e; `?` consumes one
+composed scalar. Ranges, negation and escapes use those scalars too. A bracket
+member that remains multiple scalars is rejected when the pattern compiles.
+The allocation-free `Composed` iterator and `foldCase` share sweep's Unicode
+data with callers; filesystem equivalence policy remains the caller's.
 
 `Options.anywhere` is gitignore's basename rule: a pattern holding no separator
 byte matches the last component at any depth.
@@ -249,7 +257,8 @@ expansion returns the union of matches; ignore-file precedence stays with caller
 ## Scope
 - No reading of ignore or attribute files: `gitignore.parseLine` reads one line, and
   files, levels and precedence are the caller's.
-- No Unicode normalisation or full case-fold expansion.
+- Canonical NFC is optional; no compatibility normalization or full case-fold
+  expansion.
 - No `\` as a separator: turn Windows paths into `/` paths before matching, and
   pass `.escape = false` for patterns written with `\`:
   `for (path) |*c| if (c.* == '\\') c.* = '/';`

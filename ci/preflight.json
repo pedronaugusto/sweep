@@ -11,6 +11,9 @@
   "test_dependencies": [
     "shakedown"
   ],
+  "shipped": {
+    "docs/design.md": "Published architecture and ownership contracts accompany the package and the README design link."
+  },
   "function_exceptions": {},
   "layout_exceptions": {},
   "docs": {
