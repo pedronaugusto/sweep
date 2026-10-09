@@ -1,65 +1,26 @@
-//! Path globs: git's wildmatch exactly, the common glob dialects, single
-//! patterns and sets of them, in time linear in the subject.
-const syntax = @import("syntax.zig");
-const match_mod = @import("match.zig");
-const helpers = @import("helpers.zig");
-const pattern_mod = @import("pattern.zig");
-const set_mod = @import("set.zig");
+//! Path globs and optional filesystem expansion.
+pub const glob = @import("sweep.glob");
+pub const walk = @import("sweep.walk");
 
-/// One glob dialect, field by field, with presets.
-pub const Syntax = syntax.Syntax;
-/// How letters compare.
-pub const Case = syntax.Case;
-/// What a pattern means: dialect, case and the basename rule.
-pub const Options = syntax.Options;
-/// Where and why a pattern was refused.
-pub const Diagnostics = syntax.Diagnostics;
-/// Why a pattern cannot be matched.
-pub const PatternError = syntax.PatternError;
-
-/// Whether a pattern matches all of a subject, with no allocation.
-pub const match = match_mod.match;
-/// The longest pattern, in units, `match` always takes.
-pub const inline_units = match_mod.inline_units;
-
-/// A pattern compiled once and matched many times.
-pub const Pattern = pattern_mod.Pattern;
-/// Why a pattern cannot be compiled.
-pub const CompileError = pattern_mod.CompileError;
-
-/// Many patterns matched in one pass.
-pub const Set = set_mod.Set;
-/// Whether a subject is a file or a directory.
-pub const Kind = set_mod.Kind;
-
-/// The line grammar of gitignore files.
-pub const gitignore = @import("gitignore.zig");
-
-/// Whether a byte has meaning outside brackets.
-pub const isSpecial = helpers.isSpecial;
-/// Length of a pattern's leading run with no special byte.
-pub const literalPrefix = helpers.literalPrefix;
-/// Writes a literal as a pattern that matches exactly it.
-pub const escape = helpers.escape;
-/// Errors from `escape`.
-pub const EscapeError = helpers.EscapeError;
-
-/// Filesystem glob expansion with pruning and explicit traversal policy.
-pub const Walk = @import("walk.zig").Walk;
-/// A borrowed Pattern or Set used by a filesystem walk.
-pub const Matcher = @import("walk.zig").Matcher;
-/// Owned glob expansion results.
-pub const Paths = @import("walk.zig").Paths;
-/// Expands a matcher against a directory.
-pub const expand = @import("walk.zig").expand;
-
-/// Allocation-free NFC scalar iterator. `at` retains original byte boundaries;
-/// invalid UTF-8 bytes use codes above Unicode scalars and remain distinct.
-pub const Composed = @import("normal.zig").Iterator;
-
-/// Unicode 18 default simple case folding of one scalar.
-/// This is the same mapping used by `Case.unicode`: no normalization,
-/// expansion or Turkic mappings. Codes outside Unicode stay unchanged,
-/// including a caller's distinct codes for ill-formed UTF-8 bytes.
-/// Sweep owns the mapping; filesystem identity policy remains the caller's.
-pub const foldCase = @import("unicode.zig").fold;
+pub const Syntax = glob.Syntax;
+pub const Case = glob.Case;
+pub const Options = glob.Options;
+pub const Diagnostics = glob.Diagnostics;
+pub const PatternError = glob.PatternError;
+pub const match = glob.match;
+pub const inline_units = glob.inline_units;
+pub const Pattern = glob.Pattern;
+pub const CompileError = glob.CompileError;
+pub const Set = glob.Set;
+pub const Kind = glob.Kind;
+pub const gitignore = glob.gitignore;
+pub const isSpecial = glob.isSpecial;
+pub const literalPrefix = glob.literalPrefix;
+pub const escape = glob.escape;
+pub const EscapeError = glob.EscapeError;
+pub const Composed = glob.Composed;
+pub const foldCase = glob.foldCase;
+pub const Walk = walk.Walk;
+pub const Matcher = walk.Matcher;
+pub const Paths = walk.Paths;
+pub const expand = walk.expand;

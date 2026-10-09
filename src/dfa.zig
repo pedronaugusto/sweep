@@ -5,6 +5,7 @@
 //! component-start bit, since a hidden leading dot and a globstar's
 //! separator both look one unit back. Threads that can no longer reach an
 //! accept are dropped, so the empty kernel is the one dead state.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; state partitions consume only a validated Program and bounded scratch.
 const std = @import("std");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");

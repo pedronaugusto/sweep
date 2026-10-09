@@ -1,6 +1,7 @@
 //! Ordered Pike simulation for captures. A per-thread cache owns the tagged
 //! program and scratch; ordinary matching carries no capture bookkeeping.
 const std = @import("std");
+const aegis = @import("aegis");
 const syntax = @import("syntax.zig");
 const program_mod = @import("program.zig");
 const parse = @import("parse.zig");
@@ -8,6 +9,7 @@ const Allocator = std.mem.Allocator;
 const Context = program_mod.Context;
 
 /// Byte offsets of a captured wildcard or group in the original subject.
+// aegis: no-danger: docs/design.md#safety-boundaries; both endpoints are original subject byte offsets, with no other domain or arithmetic in the result.
 pub const Capture = struct { start: usize, end: usize };
 /// The caller's output has fewer slots than the pattern's capture count.
 pub const MatchError = error{BufferTooSmall};
@@ -42,19 +44,20 @@ pub const Cache = struct {
     start: bool = true,
 
     const unset = std.math.maxInt(usize);
+    // aegis: measured-boundary: docs/design.md#safety-boundaries; validated tagged-program states and history offsets stay raw in the allocation-free executor.
     const Kernel = struct { ids: []u32, histories: []usize, len: usize = 0 };
 
     /// Used by Pattern.captureCache after the source has been validated.
     pub fn init(gpa: Allocator, source: []const u8, options: syntax.Options) InitError!Cache {
-        var bounds: program_mod.Bounds = .of(source, options);
-        bounds.nodes += 2 * source.len + 4;
-        const nodes = try gpa.alloc(program_mod.Node, bounds.nodes);
+        var bounds: program_mod.Bounds = try program_mod.Bounds.of(source, options);
+        try bounds.capture(source);
+        const nodes = try gpa.alloc(program_mod.Node, bounds.nodes.raw());
         errdefer gpa.free(nodes);
-        const classes = try gpa.alloc(program_mod.Class, bounds.classes);
+        const classes = try gpa.alloc(program_mod.Class, bounds.classes.raw());
         errdefer gpa.free(classes);
-        const ranges = try gpa.alloc(program_mod.Range, bounds.ranges);
+        const ranges = try gpa.alloc(program_mod.Range, bounds.ranges.raw());
         errdefer gpa.free(ranges);
-        const frames = try gpa.alloc(program_mod.Frame, bounds.frames);
+        const frames = try gpa.alloc(program_mod.Frame, bounds.frames.raw());
         defer gpa.free(frames);
         var b: program_mod.Builder = .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = frames, .capture = true };
         try parse.parse(&b, source, options, .{});
@@ -64,8 +67,9 @@ pub const Cache = struct {
         errdefer gpa.free(cur);
         const next = try gpa.alloc(u32, states);
         errdefer gpa.free(next);
-        const histories = std.math.mul(usize, states, slots) catch return error.OutOfMemory;
-        const pending_count = std.math.mul(usize, histories, 2) catch return error.OutOfMemory;
+        const history_count = aegis.int.Checked(usize).init(states).mul(slots) catch return error.OutOfMemory;
+        const histories = history_count.raw();
+        const pending_count = (history_count.mul(2) catch return error.OutOfMemory).raw();
         const history = try gpa.alloc(usize, histories);
         errdefer gpa.free(history);
         const other = try gpa.alloc(usize, histories);

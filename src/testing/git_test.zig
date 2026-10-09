@@ -1,6 +1,6 @@
 //! git's dialect, case by case, and against the reference.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 
 const expect = std.testing.expect;
 

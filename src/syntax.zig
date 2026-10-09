@@ -125,6 +125,7 @@ pub const Options = struct {
 };
 
 /// Where and why a pattern was refused.
+// aegis: no-danger: docs/design.md#safety-boundaries; the diagnostic reports one source byte offset, never a program or entry index.
 pub const Diagnostics = struct {
     /// Byte offset in the pattern where the problem was found.
     offset: usize = 0,

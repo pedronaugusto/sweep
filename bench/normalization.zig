@@ -5,7 +5,7 @@ const shakedown = @import("shakedown");
 const Context = struct {
     pattern: sweep.Pattern,
     subject: []const u8,
-    fn run(c: *Context, n: u64) !void {
+    fn run(c: *Context, n: u64) error{}!void {
         var hits: usize = 0;
         for (0..n) |_| {
             hits += @intFromBool(c.pattern.matches(c.subject));
@@ -34,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
     for (rows) |r| {
         var c: Context = .{ .pattern = try sweep.Pattern.compile(init.gpa, r[1], options), .subject = r[2] };
         defer c.pattern.deinit();
-        try shakedown.bench.run(init.gpa, init.io, &out.interface, &c, &.{.{ .name = r[0], .unit = "query", .run = Context.run }}, .{ .commit = "normalization-seam" }, .{ .smoke = smoke });
+        try shakedown.bench.run(error{}, init.gpa, init.io, &out.interface, &c, &.{.{ .name = r[0], .unit = "query", .run = Context.run }}, .{ .commit = "normalization-seam" }, .{ .smoke = smoke });
     }
     try out.interface.flush();
 }

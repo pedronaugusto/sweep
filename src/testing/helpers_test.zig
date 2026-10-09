@@ -1,6 +1,6 @@
 //! `escape` against the matcher: an escaped literal matches itself.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
 
 fn escapeOne(s: gen.Source) anyerror!void {

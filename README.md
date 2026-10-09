@@ -13,9 +13,12 @@ matches composed scalars in patterns and names; defaults remain exact.
 
 Requires Zig 0.17.0. Fetch with `zig fetch --save
 git+https://github.com/pedronaugusto/sweep`, then obtain the `sweep` module through
-`b.dependency` and add it to your executable's imports. sweep has no dependencies
+`b.dependency` and add it to your executable's imports. sweep depends on the
+std-only aegis safety library
 at runtime. Its matching and capture APIs build for every target,
 wasm32-freestanding included. Optional filesystem expansion uses `std.Io`.
+The root `sweep` module is a facade over `sweep.glob` (pure matching and Unicode
+transforms) and `sweep.walk` (filesystem expansion), each available alone.
 See [the design](docs/design.md) for ownership, layers and matching bounds.
 
 ## Usage
@@ -92,7 +95,7 @@ defer builder.deinit();
 var negated: [lines.len]bool = undefined;
 for (lines) |line| {
     const parsed = sweep.gitignore.parseLine(line) orelse continue;
-    negated[try builder.add(parsed.pattern, parsed.entry)] = parsed.negated;
+    negated[(try builder.add(parsed.pattern, parsed.entry)).raw()] = parsed.negated;
 }
 var set = try builder.build();
 defer set.deinit();
@@ -102,7 +105,7 @@ defer cache.deinit();
 // The last matching line decides, and a negated line re-includes.
 const ignored = struct {
     fn f(s: *const sweep.Set, c: *sweep.Set.Cache, n: []const bool, path: []const u8, kind: sweep.Kind) bool {
-        return if (s.last(c, path, kind)) |i| !n[i] else false;
+        return if (s.last(c, path, kind)) |i| !n[i.raw()] else false;
     }
 }.f;
 std.debug.assert(ignored(&set, &cache, &negated, "x/debug.log", .file));
@@ -111,7 +114,7 @@ std.debug.assert(ignored(&set, &cache, &negated, "build", .dir));
 // Every parent in one pass: a file under an ignored directory is ignored.
 var it = set.ancestors(&cache, "build/out/keep.log", .file);
 while (it.next()) |step| {
-    if (step.last) |i| if (!negated[i]) break;
+    if (step.last) |i| if (!negated[i.raw()]) break;
 }
 ```
 <!-- END GENERATED -->
@@ -227,8 +230,8 @@ offset and the reason.
 | `Walk.open(gpa, io, dir, matcher, options)` | Starts a filesystem walk at a Pattern’s base, pruning with `leadsTo`; a matcher borrows a Pattern or a Set and its dedicated cache |
 | `walk.next(io)`, `walk.deinit(io)` | Next borrowed path, or release owned directories and buffers |
 | `expand(gpa, io, dir, matcher, options)` | Owned paths in a `Paths` result; release with `paths.deinit()` |
-| `Set.Builder.add(pattern, entry)` | Adds an entry and returns its index; `entry.dir_only` matches directories only |
-| `set.any`, `first`, `last`, `all` | Whether any entry matches; the lowest or highest matching index; every index, ascending |
+| `Set.Builder.add(pattern, entry)` | Adds an entry and returns a `Set.Index`; `entry.dir_only` matches directories only |
+| `set.any`, `first`, `last`, `all` | Whether any entry matches; the lowest or highest matching index; every `Set.Index`, ascending |
 | `set.ancestors(cache, path, kind)` | One pass over every prefix of a path: the last entry matching each, and whether anything below can |
 | `set.leadsTo(cache, dir)` | Whether anything below `dir` could match |
 | `gitignore.parseLine(line)` | One ignore-file line: its pattern, `Set.Entry` and whether it is negated |
@@ -238,7 +241,7 @@ A set's entries share primary and alternate separators (`error.SeparatorMismatch
 otherwise); each has
 its own syntax, case and `anywhere`. A `Set` is immutable and any number of threads
 may query it, each through a `Set.Cache` of its own. Negation and include or
-exclude policy are the caller's: gitignore is `if (set.last(...)) |i| !negated[i]`.
+exclude policy are the caller's: gitignore is `if (set.last(...)) |i| !negated[i.raw()]`.
 
 Captures include star runs, question marks, brackets and brace/range/extglob
 groups. Scratch costs O(states × captures). Each subject position visits each

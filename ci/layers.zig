@@ -41,6 +41,7 @@ pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "line grammar", .patterns = &.{
         "src/gitignore.zig",
     } },
+    .{ .name = "glob facade", .patterns = &.{"src/glob.zig"} },
     .{ .name = "walking", .patterns = &.{"src/walk.zig"} },
     .{ .name = "public", .patterns = &.{
         "src/sweep.zig",
@@ -49,11 +50,17 @@ pub const layers: []const gantry.rules.Layer = &.{
 
 pub const entries: []const []const u8 = &.{};
 
-pub const modules: []const gantry.NamedModule = &.{};
+pub const modules: []const gantry.NamedModule = &.{
+    .{ .name = "sweep.glob", .path = "src/glob.zig" },
+    .{ .name = "sweep.walk", .path = "src/walk.zig" },
+};
 
 const package_references = [_]gantry.rules.ReferenceRule{
     .{ .name = "named dependencies", .unresolved_only = true, .except_targets = &.{
         "std",
+        "aegis",
+        "sweep.glob",
+        "sweep.walk",
         "shakedown",
         "preflight_rules",
     } },
@@ -85,6 +92,7 @@ pub const required = [_][]const u8{
     "src/lazy.zig",
     "src/set.zig",
     "src/gitignore.zig",
+    "src/glob.zig",
     "src/sweep.zig",
     "src/tests.zig",
 };

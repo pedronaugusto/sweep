@@ -3,6 +3,7 @@
 const std = @import("std");
 const program = @import("program.zig");
 
+// aegis: design: docs/design.md#safety-boundaries; parseInt checks both signed bounds in every mode and read rejects descending intervals.
 pub const Interval = struct { lo: i64, hi: i64, end: usize };
 pub const ReadError = error{InvalidRange};
 
@@ -41,26 +42,27 @@ pub fn compile(b: *program.Builder, interval: Interval) CompileError!void {
         if (lo == 0) try compiler.magnitude('-', 0, 0);
     }
     const end = b.node_len;
-    if (compiler.split) |split| b.nodes[split] = .{ .op = .jump, .arg = @intCast(split + 1) };
+    if (compiler.split) |split| b.nodes[split.raw()] = .{ .op = .jump, .arg = @intCast(split.raw() + 1) }; // safe: split precedes its emitted branch
     var jump = compiler.jumps;
     while (jump != program.no_jump) {
-        const next = b.nodes[jump].arg;
-        b.nodes[jump].arg = @intCast(end);
+        const next = program.Position.fromRaw(b.nodes[jump.raw()].arg);
+        b.nodes[jump.raw()].arg = @intCast(end); // safe: emit bounded every appended node
         jump = next;
     }
 }
 
 const Compiler = struct {
     b: *program.Builder,
-    split: ?u32 = null,
-    jumps: u32 = program.no_jump,
+    split: ?program.Position = null,
+    jumps: program.Position = program.no_jump,
+    // aegis: no-danger: docs/design.md#safety-boundaries; these private values index only the interned decimal classes.
     digits: [10][10]?u32 = @splat(@splat(null)),
 
     fn branch(c: *Compiler) CompileError!void {
         if (c.split) |split| {
-            const jump = try c.b.emit(.jump, @intCast(c.jumps));
+            const jump = try c.b.emit(.jump, @intCast(c.jumps.raw())); // safe: emitted jump position or max_arg sentinel
             c.jumps = jump;
-            c.b.nodes[split].arg = @intCast(c.b.node_len);
+            c.b.nodes[split.raw()].arg = @intCast(c.b.node_len); // safe: emit bounded every appended node
         }
         c.split = try c.b.emit(.split, 0);
     }
@@ -84,6 +86,7 @@ const Compiler = struct {
         _ = try c.b.emit(.class, @intCast(id));
     }
 
+    // aegis: measured-boundary: docs/design.md#safety-boundaries; read validates signed endpoints; magnitudes stay within 0..2^63 and each step checks remaining room.
     fn magnitude(c: *Compiler, sign: ?u8, low: u64, high: u64) CompileError!void {
         var cur = low;
         while (cur <= high) {

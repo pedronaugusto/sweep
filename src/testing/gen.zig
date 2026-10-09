@@ -3,7 +3,7 @@
 //! They draw from the fuzzer's `Smith` under `--fuzz`, and from a seeded
 //! generator in every `zig build test`.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 
 const Smith = std.testing.Smith;
 

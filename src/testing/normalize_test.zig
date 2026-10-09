@@ -1,6 +1,6 @@
 const std = @import("std");
 const shakedown = @import("shakedown");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const normal = @import("../normal.zig");
 const t = std.testing;
 const options: sweep.Options = .{ .syntax = .glob, .normalization = .nfc };
@@ -114,11 +114,11 @@ test "NFC ancestor captures folding and mixed set policies" {
     _ = try b.add("é", .{ .options = options });
     var s = try b.build();
     defer s.deinit();
-    var c: sweep.Set.Cache = try .init(t.allocator, &s, .{ .capacity = 256 });
+    var c: sweep.Set.Cache = try .init(t.allocator, &s, .{ .capacity = .fromRaw(256) });
     defer c.deinit();
-    try t.expectEqual(@as(?u32, 1), s.first(&c, "e\u{301}", .file));
+    try t.expectEqual(@as(?sweep.Set.Index, .fromRaw(1)), s.first(&c, "e\u{301}", .file));
     var ancestors = s.ancestors(&c, "e\u{301}/x", .file);
-    try t.expectEqual(@as(?u32, 1), ancestors.next().?.last);
+    try t.expectEqual(@as(?sweep.Set.Index, .fromRaw(1)), ancestors.next().?.last);
 }
 test "NFC unbounded combining runs remain canonically ordered" {
     const long = shakedown.corpus.repeat("\u{315}\u{300}", 2048);
@@ -153,7 +153,7 @@ fn allocationCase(gpa: std.mem.Allocator) !void {
     _ = try b.add("café/[é]", .{ .options = options });
     var s = try b.build();
     defer s.deinit();
-    var c: sweep.Set.Cache = try .init(gpa, &s, .{ .capacity = 256 });
+    var c: sweep.Set.Cache = try .init(gpa, &s, .{ .capacity = .fromRaw(256) });
     defer c.deinit();
     try t.expect(s.any(&c, "cafe\u{301}/e\u{301}", .file));
 }
@@ -171,18 +171,18 @@ test "alternate separators stop ancestor prefixes at original byte offsets" {
             _ = try b.add("cache/*", .{ .options = opts });
             var set = try b.build();
             defer set.deinit();
-            var c: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = 1 });
+            var c: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = .fromRaw(1) });
             defer c.deinit();
             var prefixes = set.ancestors(&c, subject, .file);
             const dir = prefixes.next().?;
             try t.expectEqual(@as(usize, 5), dir.end);
-            try t.expectEqual(@as(?u32, null), dir.last);
+            try t.expectEqual(@as(?sweep.Set.Index, null), dir.last);
             const entry = prefixes.next().?;
             try t.expectEqual(@as(usize, 9), entry.end);
             try t.expectEqual(@as(?u32, 0), entry.last);
             const tail = prefixes.next().?;
             try t.expectEqual(subject.len, tail.end);
-            try t.expectEqual(@as(?u32, null), tail.last);
+            try t.expectEqual(@as(?sweep.Set.Index, null), tail.last);
             try t.expect(prefixes.next() == null);
         }
     }
@@ -199,9 +199,9 @@ test "alternate ancestor separators preserve composed offsets and set grammar" {
         try t.expectError(error.SeparatorMismatch, b.add("x", .{ .options = incompatible }));
         var set = try b.build();
         defer set.deinit();
-        var cache: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = capacity });
+        var cache: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = .fromRaw(capacity) });
         defer cache.deinit();
-        var direct: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = capacity });
+        var direct: sweep.Set.Cache = try .init(t.allocator, &set, .{ .capacity = .fromRaw(capacity) });
         defer direct.deinit();
         const subject = "\\w\\e\u{301}\\child";
         var it = set.ancestors(&cache, subject, .file);
@@ -210,7 +210,7 @@ test "alternate ancestor separators preserve composed offsets and set grammar" {
             try t.expectEqual(end, step.end);
             const kind: sweep.Set.Kind = if (end == subject.len) .file else .dir;
             try t.expectEqual(set.last(&direct, subject[0..end], kind), step.last);
-            try t.expectEqual(@as(?u32, if (end == 6) 0 else null), step.last);
+            try t.expectEqual(@as(?sweep.Set.Index, if (end == 6) .fromRaw(0) else null), step.last);
         }
         try t.expect(it.next() == null);
     }

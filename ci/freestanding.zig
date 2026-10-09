@@ -2,7 +2,7 @@
 //! `zig build check-freestanding`, and its exports reach every public
 //! query, while filesystem expansion stays in its optional Io layer.
 const std = @import("std");
-const sweep = @import("sweep");
+const sweep = @import("sweep.glob");
 
 var heap: [1 << 20]u8 = undefined;
 
@@ -37,13 +37,13 @@ export fn sweepSet(line: [*]const u8, line_len: usize, subject: [*]const u8, sub
     _ = builder.add(parsed.pattern, parsed.entry) catch return -1;
     var set = builder.build() catch return -1;
     defer set.deinit();
-    var cache: sweep.Set.Cache = sweep.Set.Cache.init(gpa, &set, .{ .capacity = 1 << 16 }) catch return -1;
+    var cache: sweep.Set.Cache = sweep.Set.Cache.init(gpa, &set, .{ .capacity = .fromRaw(1 << 16) }) catch return -1;
     defer cache.deinit();
     const text = subject[0..subject_len];
     var bits: i32 = @intFromBool(set.any(&cache, text, .file));
     if (set.first(&cache, text, .dir) != null) bits |= 2;
     if (set.last(&cache, text, .file) != null) bits |= 4;
-    var out: std.ArrayList(u32) = .empty;
+    var out: std.ArrayList(sweep.Set.Index) = .empty;
     defer out.deinit(gpa);
     set.all(gpa, &cache, text, .file, &out) catch return -1;
     if (out.items.len > 0) bits |= 8;

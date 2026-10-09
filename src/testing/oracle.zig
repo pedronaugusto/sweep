@@ -5,7 +5,7 @@
 //! matched by plain backtracking. Both are exponential, which is fine on
 //! the short inputs the tests give it.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 
 const Code = u32;
 const ill_formed: Code = 0x110000;

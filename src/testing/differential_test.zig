@@ -1,7 +1,7 @@
 //! The automaton against its two oracles: git's own `dowild` for the git
 //! dialects, and the naive backtracker for every dialect and case.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const dowild = @import("dowild.zig");
 const oracle = @import("oracle.zig");
 const t3070 = @import("t3070.zig");

@@ -1,17 +1,16 @@
 //! Optional filesystem expansion. The matcher stays pure; the walk owns
 //! directory handles and path buffers and takes Io on every blocking call.
 const std = @import("std");
-const pattern = @import("pattern.zig");
-const set_mod = @import("set.zig");
+const glob = @import("sweep.glob");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
 /// A borrowed matcher. A set's cache must be dedicated to this walk.
 pub const Matcher = union(enum) {
-    pattern: *const pattern.Pattern,
-    set: struct { set: *const set_mod.Set, cache: *set_mod.Set.Cache },
+    pattern: *const glob.Pattern,
+    set: struct { set: *const glob.Set, cache: *glob.Set.Cache },
 
-    fn matches(m: Matcher, path: []const u8, kind: set_mod.Kind) bool {
+    fn matches(m: Matcher, path: []const u8, kind: glob.Kind) bool {
         return switch (m) {
             .pattern => |p| p.matches(path),
             .set => |s| s.set.any(s.cache, path, kind),
@@ -62,7 +61,7 @@ pub const Walk = struct {
         order: enum { filesystem, lexical } = .filesystem,
     };
     /// A path relative to `dir`, borrowed until the next call or deinit.
-    pub const Entry = struct { path: []const u8, kind: set_mod.Kind };
+    pub const Entry = struct { path: []const u8, kind: glob.Kind };
     /// Opening, reading or allocating the expansion failed.
     pub const OpenError = Allocator.Error || Io.Dir.OpenError || Io.Dir.RealPathError || error{InvalidSeparator};
     /// Traversal failed; the walk remains valid and still needs deinit.
@@ -247,4 +246,8 @@ pub fn expand(gpa: Allocator, io: Io, dir: Io.Dir, matcher: Matcher, options: Wa
     while (try walk.next(io)) |entry| try paths.add(entry);
     if (options.order == .lexical) paths.sort();
     return paths;
+}
+
+test {
+    _ = @import("testing/walk_test.zig");
 }

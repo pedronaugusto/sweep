@@ -1,7 +1,7 @@
 //! Memory: every allocation failure is survived without a leak, and no
 //! query allocates.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 const NoResize = @import("shakedown").alloc.NoResize;
 
@@ -43,7 +43,7 @@ fn buildSet(gpa: std.mem.Allocator) !void {
     _ = try builder.add("a/b/c", .{});
     var set = try builder.build();
     defer set.deinit();
-    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = 1 << 16 });
+    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(1 << 16) });
     defer cache.deinit();
     _ = set.last(&cache, "x/node_modules", .dir);
 }
@@ -82,9 +82,9 @@ test "Set queries allocate nothing after Cache.init" {
     var set = try builder.build();
     defer set.deinit();
     // The smallest cache, so queries clear it and fall back to the NFA too.
-    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = 0 });
+    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
-    var out: std.ArrayList(u32) = try .initCapacity(gpa, set.len() * subjects.len);
+    var out: std.ArrayList(Set.Index) = try .initCapacity(gpa, @as(usize, set.len().raw()) * subjects.len);
     defer out.deinit(gpa);
     const before = failing.allocations;
     for (0..50) |_| for (subjects) |subject| {

@@ -1,5 +1,5 @@
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 const unicode = @import("../unicode.zig");
 const shake = @import("shakedown");
@@ -21,7 +21,7 @@ fn engines(gpa: std.mem.Allocator, text: []const u8, subject: []const u8, option
     _ = try b.add(text, .{ .options = options });
     var set = try b.build();
     defer set.deinit();
-    var cache: sweep.Set.Cache = try .init(gpa, &set, .{ .capacity = 0 });
+    var cache: sweep.Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
     try std.testing.expectEqual(one, set.any(&cache, subject, .file));
 }

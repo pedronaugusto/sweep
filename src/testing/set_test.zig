@@ -2,7 +2,7 @@
 //! `first`, `last`, `all`, `ancestors` and `leadsTo`, with `dir_only` and
 //! both kinds of subject.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
 const repeat = @import("shakedown").corpus.repeat;
 
@@ -59,10 +59,10 @@ fn fixture(s: gen.Source, count: usize, pieces: []const []const u8) !Fixture {
             error.InvalidPattern => continue,
             else => return err,
         };
-        try std.testing.expectEqual(patterns.items.len, index);
+        try std.testing.expectEqual(patterns.items.len, index.raw());
         try patterns.append(gpa, try .compile(gpa, pattern, options));
         try dir_only.append(gpa, entry.dir_only);
-        try texts.print(gpa, "  {d}: \"{f}\" {any} dir_only={}\n", .{ index, std.zig.fmtString(pattern), options, entry.dir_only });
+        try texts.print(gpa, "  {d}: \"{f}\" {any} dir_only={}\n", .{ index.raw(), std.zig.fmtString(pattern), options, entry.dir_only });
     }
     return .{ .set = try builder.build(), .patterns = patterns, .dir_only = dir_only, .texts = texts };
 }
@@ -70,29 +70,29 @@ fn fixture(s: gen.Source, count: usize, pieces: []const []const u8) !Fixture {
 fn queriesOne(s: gen.Source) anyerror!void {
     var f = try fixture(s, 1 + s.index(8), &gen.any_pattern);
     defer f.deinit();
-    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = if (s.oneIn(2)) 0 else 1 << 17 });
+    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(if (s.oneIn(2)) 0 else 1 << 17) });
     defer cache.deinit();
-    var out: std.ArrayList(u32) = .empty;
+    var out: std.ArrayList(Set.Index) = .empty;
     defer out.deinit(gpa);
     for (0..4) |_| {
         var text_buf: [16]u8 = undefined;
         const text = gen.string(s, &text_buf, &gen.any_text);
         const kind: sweep.Kind = if (s.value(bool)) .dir else .file;
-        var want_first: ?u32 = null;
-        var want_last: ?u32 = null;
-        var want_all: std.ArrayList(u32) = .empty;
+        var want_first: ?Set.Index = null;
+        var want_last: ?Set.Index = null;
+        var want_all: std.ArrayList(Set.Index) = .empty;
         defer want_all.deinit(gpa);
         for (0..f.patterns.items.len) |i| if (f.matches(i, text, kind)) {
-            if (want_first == null) want_first = @intCast(i);
-            want_last = @intCast(i);
-            try want_all.append(gpa, @intCast(i));
+            if (want_first == null) want_first = .fromRaw(@intCast(i));
+            want_last = .fromRaw(@intCast(i));
+            try want_all.append(gpa, .fromRaw(@intCast(i)));
         };
         out.clearRetainingCapacity();
         try f.set.all(gpa, &cache, text, kind, &out);
         const ok = f.set.any(&cache, text, kind) == (want_first != null) and
             f.set.first(&cache, text, kind) == want_first and
             f.set.last(&cache, text, kind) == want_last and
-            std.mem.eql(u32, out.items, want_all.items);
+            std.mem.eql(Set.Index, out.items, want_all.items);
         if (!ok) {
             std.debug.print("set vs \"{f}\" ({t}): want {any}, all {any}, first {?}, last {?}\n", .{ std.zig.fmtString(text), kind, want_all.items, out.items, f.set.first(&cache, text, kind), f.set.last(&cache, text, kind) });
             std.debug.print("{s}", .{f.texts.items});
@@ -111,10 +111,10 @@ fn ancestorsAgree(f: *const Fixture, cache: *Set.Cache, text: []const u8, kind: 
         const whole = end == text.len;
         const prefix = text[0..end];
         const step_kind: sweep.Kind = if (whole) kind else .dir;
-        var want_last: ?u32 = null;
+        var want_last: ?Set.Index = null;
         var want_leads = false;
         for (f.patterns.items, 0..) |*p, i| {
-            if (f.matches(i, prefix, step_kind)) want_last = @intCast(i);
+            if (f.matches(i, prefix, step_kind)) want_last = .fromRaw(@intCast(i));
             if (p.leadsTo(prefix)) want_leads = true;
         }
         const step = it.next() orelse return error.TestUnexpectedResult;
@@ -145,15 +145,15 @@ const ignore_pieces = [_][]const u8{ "a", "b", "/", "*", "**/", "/**", ".", "c",
 fn strategiesOne(s: gen.Source) anyerror!void {
     var f = try fixture(s, 1 + s.index(12), &ignore_pieces);
     defer f.deinit();
-    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = 1 << 16 });
+    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(1 << 16) });
     defer cache.deinit();
     for (0..6) |_| {
         var text_buf: [16]u8 = undefined;
         const text = gen.string(s, &text_buf, &[_][]const u8{ "a", "b", "/", ".", "c", "x", "A", ".c" });
         const kind: sweep.Kind = if (s.value(bool)) .dir else .file;
-        var want_last: ?u32 = null;
+        var want_last: ?Set.Index = null;
         for (0..f.patterns.items.len) |i| if (f.matches(i, text, kind)) {
-            want_last = @intCast(i);
+            want_last = .fromRaw(@intCast(i));
         };
         if (f.set.last(&cache, text, kind) != want_last) {
             std.debug.print("strategies vs \"{f}\": want {?}, got {?}\n", .{ std.zig.fmtString(text), want_last, f.set.last(&cache, text, kind) });
@@ -175,7 +175,7 @@ test "gitignore lines through a set: the last match decides" {
     for (lines) |line| {
         const parsed = sweep.gitignore.parseLine(line) orelse continue;
         const index = try builder.add(parsed.pattern, parsed.entry);
-        negated[index] = parsed.negated;
+        negated[index.raw()] = parsed.negated;
     }
     var set = try builder.build();
     defer set.deinit();
@@ -196,14 +196,14 @@ test "gitignore lines through a set: the last match decides" {
         .{ .path = "src/doc/b.md", .kind = .file, .ignored = false },
     };
     for (cases) |case| {
-        const ignored = if (set.last(&cache, case.path, case.kind)) |i| !negated[i] else false;
+        const ignored = if (set.last(&cache, case.path, case.kind)) |i| !negated[i.raw()] else false;
         try std.testing.expectEqual(case.ignored, ignored);
     }
     // A file below an ignored directory: the parent decides first.
     var it = set.ancestors(&cache, "build/x/keep.log", .file);
     const top = it.next().?;
     try std.testing.expectEqual(@as(usize, 5), top.end);
-    try std.testing.expect(top.last != null and !negated[top.last.?]);
+    try std.testing.expect(top.last != null and !negated[top.last.?.raw()]);
 }
 
 test "a set whose cache keeps clearing still answers within the bound" {
@@ -243,22 +243,22 @@ test "a set whose cache keeps clearing still answers within the bound" {
     }
     var set = try builder.build();
     defer set.deinit();
-    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = 0 });
+    var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
     var long: [4096]u8 = undefined;
     for (&long) |*c| c.* = "ab"[r.uintLessThan(usize, 2)];
     const subjects = [_][]const u8{ "abcdabcdabcdabcdx", repeat("aaaabbbbccccdddd", 4) ++ "y", repeat("dcbadcbadcba", 8) ++ "z", &long };
-    var out: std.ArrayList(u32) = .empty;
+    var out: std.ArrayList(Set.Index) = .empty;
     defer out.deinit(gpa);
     for (subjects) |subject| {
-        var want: std.ArrayList(u32) = .empty;
+        var want: std.ArrayList(Set.Index) = .empty;
         defer want.deinit(gpa);
-        for (patterns.items, 0..) |*p, i| if (p.matches(subject)) try want.append(gpa, @intCast(i));
-        const last: ?u32 = if (want.items.len > 0) want.items[want.items.len - 1] else null;
+        for (patterns.items, 0..) |*p, i| if (p.matches(subject)) try want.append(gpa, .fromRaw(@intCast(i)));
+        const last: ?Set.Index = if (want.items.len > 0) want.items[want.items.len - 1] else null;
         try std.testing.expectEqual(last, set.last(&cache, subject, .file));
         out.clearRetainingCapacity();
         try set.all(gpa, &cache, subject, .file, &out);
-        try std.testing.expectEqualSlices(u32, want.items, out.items);
+        try std.testing.expectEqualSlices(Set.Index, want.items, out.items);
     }
     const stats = cache.stats();
     try std.testing.expect(stats.clears > 0);
@@ -274,7 +274,7 @@ test "eight threads share one set, each with its own cache" {
     defer set.deinit();
     const Worker = struct {
         fn run(s: *const Set, failed: *std.atomic.Value(bool)) void {
-            var cache = Set.Cache.init(std.heap.page_allocator, s, .{ .capacity = 1 << 16 }) catch return failed.store(true, .monotonic);
+            var cache = Set.Cache.init(std.heap.page_allocator, s, .{ .capacity = .fromRaw(1 << 16) }) catch return failed.store(true, .monotonic);
             defer cache.deinit();
             const subjects = [_]struct { []const u8, ?u32 }{
                 .{ "x/y/z.o", 0 },        .{ "build/a/b", 1 }, .{ "src/a/test_b.zig", 2 },
@@ -282,7 +282,7 @@ test "eight threads share one set, each with its own cache" {
                 .{ "nothing", null },
             };
             for (0..2000) |_| for (subjects) |case| {
-                if (s.last(&cache, case[0], .file) != case[1]) failed.store(true, .monotonic);
+                if (s.last(&cache, case[0], .file) != (if (case[1]) |i| Set.Index.fromRaw(i) else null)) failed.store(true, .monotonic);
             };
         }
     };

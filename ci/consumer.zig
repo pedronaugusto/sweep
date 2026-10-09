@@ -1,8 +1,14 @@
-//! What a project that depends on sweep and nothing else writes. Built by
-//! `zig build check-consumer` with no packages to fetch, so sweep's
-//! build.zig must work without any of its own CI dependencies.
+//! A consumer imports the facade and either concern using only runtime dependencies.
 const sweep = @import("sweep");
+const glob = @import("sweep.glob");
+const walk = @import("sweep.walk");
 
 pub fn main() void {
-    _ = sweep.match("*.zig", "a.zig", .{}) catch false;
+    comptime {
+        if (sweep.Pattern != glob.Pattern or sweep.Set != glob.Set) @compileError("glob identity differs");
+        if (sweep.Walk != walk.Walk) @compileError("walk identity differs");
+    }
+    _ = glob.match("*.zig", "a.zig", .{}) catch false;
+    _ = glob.Set.Index.fromRaw(1);
+    _ = glob.Set.Bytes.fromRaw(65536);
 }

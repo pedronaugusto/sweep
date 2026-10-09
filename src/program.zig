@@ -8,6 +8,7 @@
 //! Contexts make braces exact: a `**` or a leading `.` reached through an
 //! alternative means what it would mean written out in full.
 const std = @import("std");
+const aegis = @import("aegis");
 const normal = @import("normal.zig");
 const unit = @import("unit.zig");
 const unicode = @import("unicode.zig");
@@ -53,6 +54,7 @@ pub const Op = enum(u4) {
 };
 
 /// One node: an operation and its operand.
+// aegis: safe-type-internals: docs/design.md#safety-boundaries; the packed operand holds several op-selected domains, validated by construction.
 pub const Node = packed struct(u32) {
     op: Op,
     arg: u28,
@@ -170,6 +172,7 @@ pub const Program = struct {
 
     /// Tests a unit folded once for all threads. Raw codes retain separator
     /// and leading-dot meaning even when their canonical code aliases one.
+    // aegis: measured-boundary: docs/design.md#safety-boundaries; the executor supplies a validated node index; all comparisons retain packed scalar form.
     pub fn consumesCanonical(p: Program, k: usize, code: unit.Code, canonical: unit.Code, start: bool) bool {
         const node = p.nodes[k];
         const r = p.reading;
@@ -188,24 +191,28 @@ pub const Program = struct {
     }
 };
 
+/// A position in the compiled program, distinct from source offsets and entry IDs.
+pub const Position = aegis.id.Id(struct {}, u32);
+
 /// One open brace group while parsing.
 pub const Frame = struct {
     /// The split that opens the current alternative.
-    split: u32,
+    split: Position,
     /// The last jump out of a finished alternative, chained through their
     /// operands; `no_jump` when none.
-    jumps: u32,
+    jumps: Position,
     /// Where the `{` is, for a diagnostic.
-    offset: u32,
+    offset: aegis.units.Bytes(u32),
     /// First node and repetition rule of this group.
-    head: u32 = 0,
+    head: Position = .fromRaw(0),
     kind: enum { brace, one, optional, zero_more, one_more } = .brace,
     capture: ?u32 = null,
 };
 
-pub const no_jump: u32 = Node.max_arg;
+pub const no_jump: Position = .fromRaw(Node.max_arg);
 
 /// Room a program is built into: fixed slices, filled from the front.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; slice cursors are validated at emit and remain raw within one construction pass.
 pub const Builder = struct {
     nodes: []Node,
     classes: []Class,
@@ -223,11 +230,11 @@ pub const Builder = struct {
 
     pub const Full = error{Full};
 
-    pub fn emit(b: *Builder, op: Op, arg: u28) Full!u32 {
+    pub fn emit(b: *Builder, op: Op, arg: u28) Full!Position {
         if (b.node_len >= b.nodes.len or b.node_len >= Node.max_arg) return error.Full;
         b.nodes[b.node_len] = .{ .op = op, .arg = arg };
         b.node_len += 1;
-        return @intCast(b.node_len - 1);
+        return .fromRaw(@intCast(b.node_len - 1)); // safe: bounded below max_arg before insertion
     }
 
     pub fn program(b: *const Builder, reading: Reading) Program {
@@ -244,33 +251,50 @@ pub const Builder = struct {
 
 /// Upper bounds on what parsing `pattern` can need, for sizing a builder.
 pub const Bounds = struct {
-    nodes: usize,
-    classes: usize,
-    ranges: usize,
-    frames: usize,
+    pub const Nodes = aegis.units.Count(Node, usize);
+    pub const Classes = aegis.units.Count(Class, usize);
+    pub const Ranges = aegis.units.Count(Range, usize);
+    pub const Frames = aegis.units.Count(Frame, usize);
+    pub const Error = error{PatternTooLong};
 
-    pub fn of(pattern: []const u8, options: syntax.Options) Bounds {
-        const sx = options.syntax;
+    nodes: Nodes = .fromRaw(0),
+    classes: Classes = .fromRaw(0),
+    ranges: Ranges = .fromRaw(0),
+    frames: Frames = .fromRaw(0),
+
+    pub fn of(pattern: []const u8, options: syntax.Options) Error!Bounds {
         var brackets: usize = 0;
         var braces: usize = 0;
+        // aegis: no-danger: docs/design.md#safety-boundaries; each counter is bounded by the source slice.
         for (pattern) |c| switch (c) {
             '[' => brackets += 1,
             '{', '(' => braces += 1,
             else => {},
         };
-        const numeric = if (sx.numeric_ranges) braces else 0;
-        return .{
-            // Two nodes a unit at most (`,` and a hidden-dot `.`), the
-            // `anywhere` prefix and the accept.
-            .nodes = 2 * pattern.len + 4 + numeric * 2048,
-            // The interval compiler interns the 45 non-singleton digit ranges.
-            .classes = brackets + numeric * 45,
-            // A member adds at most one range, a negation one more, and
-            // taking out the separator one more.
-            // Only source brackets need Unicode images; generated decimal
-            // classes contain ASCII digits, whose fold is the identity.
-            .ranges = pattern.len + 2 * brackets + (if (options.case == .unicode) brackets * 1700 else 0),
-            .frames = braces,
-        };
+        const numeric = if (options.syntax.numeric_ranges) braces else 0;
+        // Grammar expansion converts source bytes/groups to separate element domains.
+        const plain = Nodes.fromRaw(pattern.len).mul(2) catch return error.PatternTooLong;
+        const expanded = Nodes.fromRaw(numeric).mul(2048) catch return error.PatternTooLong;
+        const nodes = (plain.add(.fromRaw(4)) catch return error.PatternTooLong).add(expanded) catch return error.PatternTooLong;
+        const decimal = Classes.fromRaw(numeric).mul(45) catch return error.PatternTooLong;
+        const classes = Classes.fromRaw(brackets).add(decimal) catch return error.PatternTooLong;
+        const extra = Ranges.fromRaw(brackets).mul(if (options.case == .unicode) 1702 else 2) catch return error.PatternTooLong;
+        const ranges = Ranges.fromRaw(pattern.len).add(extra) catch return error.PatternTooLong;
+        return .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = .fromRaw(braces) };
+    }
+
+    /// Adds an entry and its fork before allocating one combined automaton.
+    pub fn append(total: *Bounds, entry: Bounds) Error!void {
+        const nodes = (total.nodes.add(entry.nodes) catch return error.PatternTooLong).add(.fromRaw(1)) catch return error.PatternTooLong;
+        const classes = total.classes.add(entry.classes) catch return error.PatternTooLong;
+        const ranges = total.ranges.add(entry.ranges) catch return error.PatternTooLong;
+        total.* = .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = if (total.frames.raw() > entry.frames.raw()) total.frames else entry.frames };
+    }
+
+    /// A tagged program adds two capture instructions per source item.
+    pub fn capture(b: *Bounds, source: []const u8) Error!void {
+        const tags = (Nodes.fromRaw(source.len).mul(2) catch return error.PatternTooLong).add(.fromRaw(4)) catch return error.PatternTooLong;
+        const nodes = b.nodes.add(tags) catch return error.PatternTooLong;
+        b.nodes = nodes;
     }
 };

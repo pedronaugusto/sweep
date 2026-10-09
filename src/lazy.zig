@@ -10,6 +10,7 @@ const dfa = @import("dfa.zig");
 
 const Allocator = std.mem.Allocator;
 const Program = program_mod.Program;
+pub const BuildError = Allocator.Error || program_mod.Bounds.Error;
 
 /// The entries of one reading that no strategy decides, as one program
 /// whose root forks into each entry.
@@ -23,33 +24,30 @@ pub const Automaton = struct {
     live: []u2 = &.{},
     units: ?dfa.Classes = null,
 
-    pub fn build(gpa: Allocator, entries: anytype, reading: program_mod.Reading) Allocator.Error!Automaton {
+    pub fn build(gpa: Allocator, entries: anytype, reading: program_mod.Reading) BuildError!Automaton {
         var a: Automaton = .{ .reading = reading };
         errdefer a.deinit(gpa);
-        var total: program_mod.Bounds = .{ .nodes = 0, .classes = 0, .ranges = 0, .frames = 0 };
+        var total: program_mod.Bounds = .{};
         var count: usize = 0;
         for (entries) |e| {
             if (!e.reading.eql(reading) or e.strategy != null) continue;
-            const bounds: program_mod.Bounds = .of(e.pattern, e.entry.options);
-            total.nodes += bounds.nodes + 1;
-            total.classes += bounds.classes;
-            total.ranges += bounds.ranges;
-            total.frames = @max(total.frames, bounds.frames);
+            const bounds: program_mod.Bounds = try program_mod.Bounds.of(e.pattern, e.entry.options);
+            try total.append(bounds);
             count += 1;
         }
         if (count == 0) return a;
         var b: program_mod.Builder = .{
-            .nodes = try gpa.alloc(program_mod.Node, total.nodes),
+            .nodes = try gpa.alloc(program_mod.Node, total.nodes.raw()),
             .classes = &.{},
             .ranges = &.{},
             .frames = &.{},
         };
         defer gpa.free(b.nodes);
-        b.classes = try gpa.alloc(program_mod.Class, total.classes);
+        b.classes = try gpa.alloc(program_mod.Class, total.classes.raw());
         defer gpa.free(b.classes);
-        b.ranges = try gpa.alloc(program_mod.Range, total.ranges);
+        b.ranges = try gpa.alloc(program_mod.Range, total.ranges.raw());
         defer gpa.free(b.ranges);
-        b.frames = try gpa.alloc(program_mod.Frame, total.frames);
+        b.frames = try gpa.alloc(program_mod.Frame, total.frames.raw());
         defer gpa.free(b.frames);
         var seen: usize = 0;
         for (entries, 0..) |e, index| {
@@ -57,8 +55,13 @@ pub const Automaton = struct {
             seen += 1;
             // A fork to this entry and to the next one.
             const fork = if (seen < count) b.emit(.split, 0) catch unreachable else null; // unreachable: sized above
-            parse.parse(&b, e.pattern, e.entry.options, .{ .index = @intCast(index), .dir_only = e.entry.dir_only }) catch unreachable; // unreachable: the pattern parsed when it was added
-            if (fork) |f| b.nodes[f].arg = @intCast(b.node_len);
+            // safe: the insertion count is below max_entries and fits the accept index.
+            const entry_index = parse.AcceptIndex.init(@intCast(index)) catch unreachable; // unreachable: max_entries is within AcceptIndex's bound
+            parse.parse(&b, e.pattern, e.entry.options, .{ .index = entry_index, .dir_only = e.entry.dir_only }) catch |err| switch (err) {
+                error.PatternTooLong => return error.PatternTooLong,
+                error.InvalidPattern => unreachable, // unreachable: immutable source parsed successfully when added
+            };
+            if (fork) |f| b.nodes[f.raw()].arg = @intCast(b.node_len);
         }
         a.nodes = try gpa.dupe(program_mod.Node, b.nodes[0..b.node_len]);
         a.classes = try gpa.dupe(program_mod.Class, b.classes[0..b.class_len]);
@@ -131,6 +134,7 @@ const State = struct {
 };
 
 /// One thread's states for one automaton, in a fixed allocation.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; cache state/arena indices remain private and valid only until the next clear; typed byte capacity enters at Set.Cache.init.
 pub const Cache = struct {
     automaton: *const Automaton,
     /// Kernels, transition rows and accept lists.

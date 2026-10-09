@@ -1,6 +1,6 @@
 //! The public scalar mapping shares the matcher's one Unicode owner.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const unicode = @import("../unicode.zig");
 const shake = @import("shakedown");
 

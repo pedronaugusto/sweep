@@ -85,21 +85,21 @@ pub const Pattern = struct {
         const sx = options.syntax;
         if (sx.alternate_separator == null and options.normalization == .exact and options.case == .sensitive and sx.unit == .byte and sx.leading_dot == .ordinary and !options.anywhere and !sx.basename and !sx.root_slash and helpers.literalPrefix(pattern, sx) == pattern.len)
             return compileLiteral(gpa, pattern, options);
-        const bounds: program_mod.Bounds = .of(pattern, options);
+        const bounds: program_mod.Bounds = try program_mod.Bounds.of(pattern, options);
         var storage: match_mod.Storage = undefined;
-        const small = bounds.nodes <= storage.nodes.len and bounds.classes <= storage.classes.len and bounds.ranges <= storage.ranges.len and bounds.frames <= storage.frames.len;
+        const small = bounds.nodes.raw() <= storage.nodes.len and bounds.classes.raw() <= storage.classes.len and bounds.ranges.raw() <= storage.ranges.len and bounds.frames.raw() <= storage.frames.len;
         var b: program_mod.Builder = .{
-            .nodes = if (small) &storage.nodes else try gpa.alloc(program_mod.Node, bounds.nodes),
+            .nodes = if (small) &storage.nodes else try gpa.alloc(program_mod.Node, bounds.nodes.raw()),
             .classes = &.{},
             .ranges = &.{},
             .frames = &.{},
         };
         defer if (!small) gpa.free(b.nodes);
-        b.classes = if (small) &storage.classes else try gpa.alloc(program_mod.Class, bounds.classes);
+        b.classes = if (small) &storage.classes else try gpa.alloc(program_mod.Class, bounds.classes.raw());
         defer if (!small) gpa.free(b.classes);
-        b.ranges = if (small) &storage.ranges else try gpa.alloc(program_mod.Range, bounds.ranges);
+        b.ranges = if (small) &storage.ranges else try gpa.alloc(program_mod.Range, bounds.ranges.raw());
         defer if (!small) gpa.free(b.ranges);
-        b.frames = if (small) &storage.frames else try gpa.alloc(program_mod.Frame, bounds.frames);
+        b.frames = if (small) &storage.frames else try gpa.alloc(program_mod.Frame, bounds.frames.raw());
         defer if (!small) gpa.free(b.frames);
         try parse.parse(&b, pattern, options, .{});
 
@@ -137,7 +137,7 @@ pub const Pattern = struct {
         }
         p.live = try dfa.liveness(gpa, prog);
         try p.literal(prog, pattern);
-        if (p.strategy == null) p.direct = direct.Compiled.init(pattern, options, b.class_len, .{ .units = max_units, .brackets = bounds.classes });
+        if (p.strategy == null) p.direct = direct.Compiled.init(pattern, options, b.class_len, .{ .units = max_units, .brackets = bounds.classes.raw() });
         p.base_text = try baseOf(gpa, pattern, options);
         if (p.strategy == null and p.direct == null) p.eager = try Eager.build(gpa, prog, p.live);
         if (p.nodes.len > max_nodes) {

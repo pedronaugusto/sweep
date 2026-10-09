@@ -2,7 +2,7 @@
 //! (node, context) states stay within (n + 1) × states, at sizes where a
 //! backtracker would not finish.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const program = @import("../program.zig");
 const parse = @import("../parse.zig");
 const nfa = @import("../nfa.zig");
@@ -19,12 +19,12 @@ const Owned = struct {
     options: sweep.Options,
 
     fn init(pattern: []const u8, options: sweep.Options) !Owned {
-        const bounds: program.Bounds = .of(pattern, options);
+        const bounds: program.Bounds = try program.Bounds.of(pattern, options);
         var b: program.Builder = .{
-            .nodes = try gpa.alloc(program.Node, bounds.nodes),
-            .classes = try gpa.alloc(program.Class, bounds.classes),
-            .ranges = try gpa.alloc(program.Range, bounds.ranges),
-            .frames = try gpa.alloc(program.Frame, bounds.frames),
+            .nodes = try gpa.alloc(program.Node, bounds.nodes.raw()),
+            .classes = try gpa.alloc(program.Class, bounds.classes.raw()),
+            .ranges = try gpa.alloc(program.Range, bounds.ranges.raw()),
+            .frames = try gpa.alloc(program.Frame, bounds.frames.raw()),
         };
         try parse.parse(&b, pattern, options, .{});
         const words = nfa.words(b.node_len);

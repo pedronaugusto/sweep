@@ -6,6 +6,7 @@
 //! Repeated extglobs use visited contexts only when a backward edge exists,
 //! each (node, context) taken at most once per position: O(m) per unit and
 //! O(n·m) per subject, asserted in safe builds.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; kernels consume a validated Program and bounded caller scratch, preserving raw node/context operations.
 const std = @import("std");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");

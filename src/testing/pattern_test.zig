@@ -1,7 +1,7 @@
 //! A compiled pattern against the one-shot matcher: every executor gives
 //! the same answer, and `ancestor` and `leadsTo` equal brute force.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
 const repeat = @import("shakedown").corpus.repeat;
 const pattern_mod = @import("../pattern.zig");

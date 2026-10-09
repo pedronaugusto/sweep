@@ -1,5 +1,5 @@
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 
 fn agrees(pattern: []const u8, subject: []const u8, options: sweep.Options, want: bool) !void {
@@ -13,7 +13,7 @@ fn agrees(pattern: []const u8, subject: []const u8, options: sweep.Options, want
     _ = try builder.add(pattern, .{ .options = options });
     var set = try builder.build();
     defer set.deinit();
-    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = 0 });
+    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
     try std.testing.expectEqual(want, set.any(&cache, subject, .file));
 }

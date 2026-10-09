@@ -1,6 +1,6 @@
 //! Deterministic guards for the strategies behind the measured workloads.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 const repeat = @import("shakedown").corpus.repeat;
 
@@ -23,7 +23,7 @@ test "9000-unit literal prefix set queries build no DFA states" {
     _ = try b.add(text, .{});
     var set = try b.build();
     defer set.deinit();
-    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = 0 });
+    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
     try std.testing.expect(set.any(&cache, subject, .file));
     try std.testing.expect(!set.any(&cache, subject ++ "/x", .file));
@@ -36,7 +36,7 @@ test "9000-unit repeated ab-star Set queries build no DFA states" {
     _ = try b.add(repeat("ab*", 3000), .{});
     var set = try b.build();
     defer set.deinit();
-    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = 0 });
+    var cache: sweep.Set.Cache = try .init(std.testing.allocator, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
     try std.testing.expect(set.any(&cache, repeat("ab", 3000), .file));
     try std.testing.expect(!set.any(&cache, repeat("ab", 2999), .file));

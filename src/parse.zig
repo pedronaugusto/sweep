@@ -2,6 +2,7 @@
 //! and extglobs use an explicit stack of open groups; brackets are read by git's own
 //! procedure and turned into a class by the dialect's case rule.
 const std = @import("std");
+const aegis = @import("aegis");
 const normal = @import("normal.zig");
 const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
@@ -16,9 +17,11 @@ const Code = unit.Code;
 
 pub const Error = syntax.PatternError;
 
+pub const AcceptIndex = aegis.int.Ranged(u32, 0, (1 << 27) - 1);
+
 /// What the accept node of a parsed pattern reports.
 pub const Entry = struct {
-    index: u27 = 0,
+    index: AcceptIndex = AcceptIndex.init(0) catch unreachable, // unreachable: zero is within the declared encoding range
     dir_only: bool = false,
 };
 
@@ -64,6 +67,7 @@ const Last = enum {
 
 const Tri = enum { yes, no, maybe };
 
+// aegis: measured-boundary: docs/design.md#safety-boundaries; source and scratch cursors are bounded by their slices before each read or emit.
 const Parser = struct {
     b: *Builder,
     pattern: []const u8,
@@ -131,12 +135,12 @@ const Parser = struct {
                 const frame = p.b.frames[p.depth - 1];
                 try p.close();
                 if (frame.kind == .zero_more or frame.kind == .one_more) {
-                    _ = try p.b.emit(.split, @intCast(frame.head + 1));
+                    _ = try p.b.emit(.split, @intCast(frame.head.raw() + 1)); // safe: the group head was emitted within max_arg
                     p.b.cyclic = true;
                 }
                 if (frame.kind == .optional or frame.kind == .zero_more) {
-                    p.b.nodes[frame.head].arg = @intCast(p.b.node_len);
-                } else p.b.nodes[frame.head] = .{ .op = .jump, .arg = @intCast(frame.head + 1) };
+                    p.b.nodes[frame.head.raw()].arg = @intCast(p.b.node_len); // safe: emit bounds every node position
+                } else p.b.nodes[frame.head.raw()] = .{ .op = .jump, .arg = @intCast(frame.head.raw() + 1) }; // safe: the head precedes this group's emitted body
                 try p.endCapture(frame.capture);
                 i += 1;
             } else if (sx.escape and c == '\\') {
@@ -197,10 +201,12 @@ const Parser = struct {
             if (!group) try p.endCapture(capture);
         }
         p.at = pattern.len;
-        if (p.depth > 0) return p.fail(if (p.b.frames[p.depth - 1].kind == .brace) .unclosed_brace else .unclosed_extglob, p.b.frames[p.depth - 1].offset);
-        _ = try p.b.emit(.accept, @as(u28, entry.index) << 1 | @intFromBool(entry.dir_only));
+        if (p.depth > 0) return p.fail(if (p.b.frames[p.depth - 1].kind == .brace) .unclosed_brace else .unclosed_extglob, p.b.frames[p.depth - 1].offset.raw());
+        // safe: AcceptIndex validates the 27-bit index before packing the directory bit.
+        _ = try p.b.emit(.accept, @as(u28, @intCast(entry.index.raw())) << 1 | @intFromBool(entry.dir_only));
     }
 
+    // aegis: design: docs/design.md#safety-boundaries; capture ordinals are issued only during the bounded tagged-program build.
     fn startCapture(p: *Parser) RunError!?u32 {
         if (!p.b.capture) return null;
         const id = p.b.capture_count;
@@ -330,7 +336,7 @@ const Parser = struct {
             const split = try p.b.emit(.split, 0);
             _ = try p.b.emit(.gstar, 1);
             _ = try p.b.emit(.star, 0);
-            p.b.nodes[split].arg = @intCast(split + 2);
+            p.b.nodes[split.raw()].arg = @intCast(split.raw() + 2); // safe: three nodes emitted successfully
         }
         p.b.uses_start = true;
     }
@@ -356,7 +362,7 @@ const Parser = struct {
         const pattern = p.pattern;
         const b = p.b;
         if (b.class_len >= b.classes.len) return error.Full;
-        var filler: class_mod.Filler = .init(b.ranges, @intCast(b.range_len), p.options.case);
+        var filler: class_mod.Filler = .init(b.ranges, aegis.int.cast(u32, b.range_len) catch return error.Full, p.options.case);
         var at = i + 1;
         if (at < pattern.len and (pattern[at] == '!' or pattern[at] == '^')) at += 1;
         const negated = at > i + 1;
@@ -435,7 +441,8 @@ const Parser = struct {
         const head = b.node_len;
         if (p.options.syntax.single_brace_literal and p.pattern[i] == '{') _ = try b.emit(.lit, '{');
         const split = try b.emit(.split, 0);
-        b.frames[p.depth] = .{ .split = split, .jumps = program.no_jump, .offset = @intCast(i), .head = @intCast(head) };
+        // safe: head precedes the successfully emitted split, bounded by max_arg.
+        b.frames[p.depth] = .{ .split = split, .jumps = program.no_jump, .offset = .fromRaw(aegis.int.cast(u32, i) catch return error.Full), .head = .fromRaw(@intCast(head)) };
         p.depth += 1;
         p.last = .open;
     }
@@ -443,10 +450,10 @@ const Parser = struct {
     fn alternative(p: *Parser) RunError!void {
         const b = p.b;
         const frame = &b.frames[p.depth - 1];
-        if (frame.kind == .brace and p.options.syntax.single_brace_literal) b.nodes[frame.head] = .{ .op = .jump, .arg = @intCast(frame.head + 1) };
-        const jump = try b.emit(.jump, @intCast(frame.jumps));
+        if (frame.kind == .brace and p.options.syntax.single_brace_literal) b.nodes[frame.head.raw()] = .{ .op = .jump, .arg = @intCast(frame.head.raw() + 1) }; // safe: the head precedes this group's emitted body
+        const jump = try b.emit(.jump, @intCast(frame.jumps.raw())); // safe: a previous emitted jump or max_arg sentinel
         frame.jumps = jump;
-        b.nodes[frame.split].arg = @intCast(b.node_len);
+        b.nodes[frame.split.raw()].arg = @intCast(b.node_len); // safe: emit bounds the current position
         frame.split = try b.emit(.split, 0);
         p.last = .open;
     }
@@ -456,11 +463,11 @@ const Parser = struct {
         const frame = b.frames[p.depth - 1];
         if (frame.kind == .brace and frame.jumps == program.no_jump and p.options.syntax.single_brace_literal) _ = try b.emit(.lit, '}');
         // The last alternative needs no split: it falls through.
-        b.nodes[frame.split] = .{ .op = .jump, .arg = @intCast(frame.split + 1) };
+        b.nodes[frame.split.raw()] = .{ .op = .jump, .arg = @intCast(frame.split.raw() + 1) }; // safe: split precedes the successfully emitted alternative
         var jump = frame.jumps;
         while (jump != program.no_jump) {
-            const next = b.nodes[jump].arg;
-            b.nodes[jump].arg = @intCast(b.node_len);
+            const next = program.Position.fromRaw(b.nodes[jump.raw()].arg);
+            b.nodes[jump.raw()].arg = @intCast(b.node_len); // safe: emit bounds the current position
             jump = next;
         }
         p.depth -= 1;

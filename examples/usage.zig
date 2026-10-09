@@ -43,7 +43,7 @@ fn ignore(gpa: std.mem.Allocator) !void {
     var negated: [lines.len]bool = undefined;
     for (lines) |line| {
         const parsed = sweep.gitignore.parseLine(line) orelse continue;
-        negated[try builder.add(parsed.pattern, parsed.entry)] = parsed.negated;
+        negated[(try builder.add(parsed.pattern, parsed.entry)).raw()] = parsed.negated;
     }
     var set = try builder.build();
     defer set.deinit();
@@ -53,7 +53,7 @@ fn ignore(gpa: std.mem.Allocator) !void {
     // The last matching line decides, and a negated line re-includes.
     const ignored = struct {
         fn f(s: *const sweep.Set, c: *sweep.Set.Cache, n: []const bool, path: []const u8, kind: sweep.Kind) bool {
-            return if (s.last(c, path, kind)) |i| !n[i] else false;
+            return if (s.last(c, path, kind)) |i| !n[i.raw()] else false;
         }
     }.f;
     std.debug.assert(ignored(&set, &cache, &negated, "x/debug.log", .file));
@@ -62,7 +62,7 @@ fn ignore(gpa: std.mem.Allocator) !void {
     // Every parent in one pass: a file under an ignored directory is ignored.
     var it = set.ancestors(&cache, "build/out/keep.log", .file);
     while (it.next()) |step| {
-        if (step.last) |i| if (!negated[i]) break;
+        if (step.last) |i| if (!negated[i.raw()]) break;
     }
     // --- README:set ---
 }

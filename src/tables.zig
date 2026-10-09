@@ -1,6 +1,7 @@
 //! A set's hashed strategies: whole paths, base names, extensions,
 //! directory prefixes and path suffixes, each looked up by a hash rolled
 //! along the subject in one pass.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; table construction receives validated insertion-order entries; private query IDs never cross into another domain.
 const std = @import("std");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");

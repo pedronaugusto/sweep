@@ -141,7 +141,7 @@ fn sets(r: Report, gpa: Allocator, a: Allocator, paths: []const []const u8, n: u
     var t = r.now();
     for (paths) |p| hits += @intFromBool(set.last(&cache, p, .file) != null);
     try r.line("set", name, "last", nsBetween(t, r.now()) / count, "ns/path");
-    var out: std.ArrayList(u32) = .empty;
+    var out: std.ArrayList(sweep.Set.Index) = .empty;
     defer out.deinit(gpa);
     t = r.now();
     for (paths) |p| {

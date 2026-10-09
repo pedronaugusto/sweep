@@ -4,14 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-- Add optional NFC scalar matching, parsed literal and class normalization,
-  and the allocation-free `Composed` iterator using Unicode 18 data.
-- Refuse normalized class members that remain several scalars.
-- Add an alternate separator spelling for native path syntax.
-
 ## [Unreleased]
+
+### Breaking
+
+- `Set.Builder.add`, `Set.first`, `Set.last` and `Set.Ancestors.Step.last`
+  return `Set.Index` instead of raw `u32`; `Set.all` appends to
+  `std.ArrayList(Set.Index)`. Use `index.raw()` at caller array boundaries.
+- `Set.len` returns `Set.Count`, and `Set.Cache.Options.capacity` takes
+  `Set.Bytes`; construct byte capacity with `Set.Bytes.fromRaw`.
+- `Set.Builder.build` returns named `Set.BuildError`, including
+  `PatternTooLong` when combined construction arithmetic or the emitted
+  program exceeds its limit.
+- Runtime dependencies now include the std-only aegis safety library.
+
+### Added
+
+- `sweep.glob` and `sweep.walk` build modules expose the existing computation
+  and filesystem concerns independently; `sweep` reexports the same identities.
+- Distinct program positions, source-byte offsets and allocation element counts;
+  ranged accept encoding and all-mode checked construction/capture arithmetic.
+- Check individual, combined and tagged construction arithmetic in every mode;
+  report combined-program exhaustion as `PatternTooLong` and preserve entry
+  issuance after a failed add.
+- Optional NFC scalar matching, parsed literal and class normalization, and the
+  allocation-free `Composed` iterator using Unicode 18 data.
+- Refuse normalized class members that remain several scalars.
+- An alternate separator spelling for native path syntax.
 
 ### Changed
 
@@ -21,8 +40,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Plain compiled byte patterns reuse validated direct execution; fixed-width star tails and basename prefixes avoid DFA construction.
 - Small compilations use stack construction, and Sets hash component prefixes, including patterns longer than `Pattern.max_units`.
 - One-shot literal rejection skips dialect setup when the first byte decides the result.
-
-### Added
 
 - `foldCase` exposes the Unicode 18 default simple scalar mapping used by
   `Case.unicode`, so filesystem consumers share one case-folding owner.

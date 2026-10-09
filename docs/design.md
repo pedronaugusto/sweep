@@ -1,6 +1,7 @@
 # Architecture
 
-sweep owns glob syntax and matching. Its runtime dependency is std. Matching,
+sweep owns glob syntax and matching. Its runtime closure is sweep → aegis → std.
+Matching,
 captures and Unicode transforms are pure computation; filesystem expansion is
 an optional layer above them that accepts the caller's `std.Io` per call.
 Ignore-file precedence, filesystem identity, root case policy and locale rules
@@ -18,7 +19,9 @@ or a performance target met.
 below are ordered from lowest to highest; imports stay within a layer or go
 downward. Paths are under `src/`. Tests have their own dependency graph;
 shakedown and preflight are lazy test/build dependencies, outside a consumer's
-runtime closure.
+runtime closure. Consumers may import `sweep.glob` alone;
+`sweep.walk` depends on it, and `sweep` imports both. The same build module
+instances are shared, so importing the root and concerns preserves type identity.
 
 | Layer | Files and responsibility |
 |---|---|
@@ -32,7 +35,8 @@ runtime closure.
 | Sets | `set.zig` owns entry order, immutable partitions and query aggregation. |
 | Line grammar | `gitignore.zig` parses a borrowed line; files, levels and precedence stay outside sweep. |
 | Walking | `walk.zig` owns traversal state above Pattern/Set pruning. |
-| Public facade | `sweep.zig` exports supported APIs without becoming their state owner. |
+| Concern facades | `glob.zig` exposes pure computation as `sweep.glob`; `walk.zig` exposes optional filesystem expansion as `sweep.walk` and imports only `sweep.glob`. |
+| Public facade | `sweep.zig` reexports these concern identities as `sweep`, without becoming their state owner. |
 
 `Pattern` owns its compiled program and copied source. Its ordinary queries use
 local scratch, so threads share no mutable matching state. `Set` owns immutable
@@ -185,3 +189,47 @@ seeded generators, allocation-failure checks and I/O faults. Deterministic tests
 protect matching bounds, scratch ownership, cleanup and query allocations.
 Benchmarks live separately in `bench/`; CI compiles them and never uses elapsed
 time as a correctness threshold.
+
+## Safety boundaries
+
+Aegis supplies distinct program positions and original source-byte offsets for
+parser frames. Set entry identities (`Set.Index`), entry counts (`Set.Count`) and
+cache byte capacity (`Set.Bytes`) are separate domains; typed results cross the
+public boundary, while validated dense indices stay raw inside query kernels.
+An index belongs to its Set: the tag distinguishes domains, not Set instances
+or lifetimes. Caches still borrow their Set and require caller synchronization.
+
+Construction bounds count Nodes, Classes, Ranges and Frames separately.
+Arithmetic is checked in all build modes before allocation; source-byte and
+group counts convert explicitly into grammar expansion bounds. Conservative
+estimates may exceed the packed instruction address space;
+accepted patterns retain their meaning. Emission enforces the actual node
+limit, and `PatternTooLong` rejects an exhausted combined program.
+Combined-bound failure leaves the
+previous bound unchanged. A failed Set build still follows its documented entry
+consumption contract. Capture-history sizing uses checked multiplication before
+allocating its state-by-capture matrices. Accept indices use a ranged integer
+before packing the directory bit into the instruction operand.
+
+Retained raw sites carry `aegis:` reasons beside their declarations or kernels.
+They fall into three classes in this implementation:
+
+- Measured boundary: parser/builder slice cursors, NFA/DFA/cache states, private
+  set/table query indices and capture histories operate on validated programs,
+  slices and dense entry order. Inner loops preserve the packed scalar form.
+- Safe type internals: a four-byte instruction operand changes meaning with its
+  Op; construction validates every domain before the executor reads it. Aegis
+  scalar factories accept ABI integer widths, so a 28-bit enum would not fit
+  this packed representation. Widening every instruction would change its cost.
+- Design or no danger: signed interval endpoints are checked by `parseInt`,
+  descending ranges are refused, and decimal magnitude steps remain within the
+  signed endpoint magnitude. Capture ordinals are privately issued by the
+  bounded compiler. Interned decimal classes and single-entry strategies never
+  cross numeric domains. Diagnostics/capture endpoints report only original
+  source/subject bytes. Unicode scalars, combining classes and source cursors
+  are separate fields bounded by their tables or borrowed slice.
+
+There are no secrets, locks beside shared data, or foreign numeric identities
+in the pure matcher. Aegis's currently published API supplies no input marker
+or owned compilation container; validation and cleanup remain with sweep's
+existing parser and explicit allocating owners. No speculative layer is added.

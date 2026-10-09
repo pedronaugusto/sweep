@@ -2,6 +2,7 @@
 //! patterns they decide, and one automaton per reading for the rest, run
 //! as a lazy DFA whose states a per-thread cache keeps.
 const std = @import("std");
+const aegis = @import("aegis");
 const syntax = @import("syntax.zig");
 const program_mod = @import("program.zig");
 const parse = @import("parse.zig");
@@ -12,6 +13,13 @@ const direct = @import("direct.zig");
 
 const Allocator = std.mem.Allocator;
 const file = @This();
+
+/// Entry identity in insertion order, distinct from program positions and counts.
+pub const EntryIndex = aegis.id.Id(struct {}, u32);
+/// Number of entries, distinct from an entry identity or a byte capacity.
+pub const EntryCount = aegis.units.Count(struct {}, u32);
+/// Cache storage in bytes.
+pub const StorageBytes = aegis.units.Bytes(usize);
 
 /// What a subject is: a file, or a directory that `dir_only` entries match.
 pub const Kind = enum { file, dir };
@@ -24,6 +32,8 @@ pub const Entry = struct {
 };
 
 /// Why an entry cannot join a set.
+pub const BuildError = lazy.BuildError;
+
 pub const AddError = errors: {
     // A block, so a linter reading the declaration sees a type.
     break :errors Allocator.Error || syntax.PatternError || error{
@@ -65,7 +75,7 @@ pub const Builder = struct {
 
     /// Adds `pattern` and returns its index, in insertion order. On error
     /// nothing is added, so indices stay dense.
-    pub fn add(b: *Builder, pattern: []const u8, entry: Entry) AddError!u32 {
+    pub fn add(b: *Builder, pattern: []const u8, entry: Entry) AddError!EntryIndex {
         if (b.entries.items.len > 0) {
             const entry_syntax = b.entries.items[0].entry.options.syntax;
             if (entry_syntax.separator != entry.options.syntax.separator or entry_syntax.alternate_separator != entry.options.syntax.alternate_separator)
@@ -73,19 +83,19 @@ pub const Builder = struct {
         }
         if (b.entries.items.len >= max_entries) return error.PatternTooLong;
         const gpa = b.gpa;
-        const bounds: program_mod.Bounds = .of(pattern, entry.options);
+        const bounds: program_mod.Bounds = try program_mod.Bounds.of(pattern, entry.options);
         var builder: program_mod.Builder = .{
-            .nodes = try gpa.alloc(program_mod.Node, bounds.nodes),
+            .nodes = try gpa.alloc(program_mod.Node, bounds.nodes.raw()),
             .classes = &.{},
             .ranges = &.{},
             .frames = &.{},
         };
         defer gpa.free(builder.nodes);
-        builder.classes = try gpa.alloc(program_mod.Class, bounds.classes);
+        builder.classes = try gpa.alloc(program_mod.Class, bounds.classes.raw());
         defer gpa.free(builder.classes);
-        builder.ranges = try gpa.alloc(program_mod.Range, bounds.ranges);
+        builder.ranges = try gpa.alloc(program_mod.Range, bounds.ranges.raw());
         defer gpa.free(builder.ranges);
-        builder.frames = try gpa.alloc(program_mod.Frame, bounds.frames);
+        builder.frames = try gpa.alloc(program_mod.Frame, bounds.frames.raw());
         defer gpa.free(builder.frames);
         try parse.parse(&builder, pattern, entry.options, .{});
         const reading: program_mod.Reading = .of(entry.options);
@@ -103,12 +113,12 @@ pub const Builder = struct {
         }
         errdefer if (stored.strategy) |s| gpa.free(s.literal);
         try b.entries.append(gpa, stored);
-        return @intCast(b.entries.items.len - 1);
+        return .fromRaw(@intCast(b.entries.items.len - 1)); // safe: max_entries checked before insertion
     }
 
     /// Builds the set from the entries added, which it takes: the builder
     /// is empty afterwards. The set is immutable and shareable.
-    pub fn build(b: *Builder) Allocator.Error!Set {
+    pub fn build(b: *Builder) BuildError!Set {
         const gpa = b.gpa;
         defer {
             for (b.entries.items) |e| {
@@ -118,7 +128,8 @@ pub const Builder = struct {
             b.entries.clearRetainingCapacity();
         }
         const entries = b.entries.items;
-        var set: Set = .{ .gpa = gpa, .count = @intCast(entries.len), .dir_only = &.{}, .parts = &.{}, .separator = null };
+        // safe: every insertion checked max_entries, below the count representation.
+        var set: Set = .{ .gpa = gpa, .count = .fromRaw(@intCast(entries.len)), .dir_only = &.{}, .parts = &.{}, .separator = null };
         errdefer set.deinit();
         set.dir_only = try gpa.alloc(bool, entries.len);
         for (entries, set.dir_only) |e, *d| d.* = e.entry.dir_only;
@@ -148,15 +159,19 @@ pub const max_entries = 1 << 26;
 /// Patterns matched together. Immutable and shareable across threads; each
 /// thread queries through a `Cache` of its own.
 pub const Set = struct {
+    pub const Index = file.EntryIndex;
+    pub const Count = file.EntryCount;
+    pub const Bytes = file.StorageBytes;
     pub const Entry = file.Entry;
     pub const Builder = file.Builder;
     pub const AddError = file.AddError;
+    pub const BuildError = file.BuildError;
     pub const Kind = file.Kind;
 
     /// Private: the allocator the set came from.
     gpa: Allocator,
     /// Private: how many entries.
-    count: u32,
+    count: EntryCount,
     /// Private: each entry's `dir_only`.
     dir_only: []bool,
     /// Private: one per reading.
@@ -182,7 +197,7 @@ pub const Set = struct {
     }
 
     /// How many entries the set holds.
-    pub fn len(s: *const Set) u32 {
+    pub fn len(s: *const Set) EntryCount {
         return s.count;
     }
 
@@ -198,7 +213,7 @@ pub const Set = struct {
 
         pub const Options = struct {
             /// Bytes for each reading's states, at least 64 KiB.
-            capacity: usize = 1 << 21,
+            capacity: StorageBytes = .fromRaw(1 << 21),
         };
 
         /// Counts that show how a cache is doing: states built, clears,
@@ -214,7 +229,7 @@ pub const Set = struct {
                 gpa.free(parts);
             }
             for (s.parts, parts) |*part, *c| {
-                c.* = .{ .lazy = try .init(gpa, &part.automaton, @max(options.capacity, 1 << 16)) };
+                c.* = .{ .lazy = try .init(gpa, &part.automaton, @max(options.capacity.raw(), 1 << 16)) };
                 done += 1;
             }
             return .{ .gpa = gpa, .parts = parts };
@@ -251,6 +266,7 @@ pub const Set = struct {
     };
 
     /// The best prefix-strategy entries an `ancestors` pass has met.
+    // aegis: measured-boundary: docs/design.md#safety-boundaries; private query indices come only from validated dense set entries.
     const Prefixes = struct {
         set: ?*const Set = null,
         any: ?u32 = null,
@@ -272,27 +288,27 @@ pub const Set = struct {
     }
 
     /// The lowest matching index.
-    pub fn first(s: *const Set, c: *Cache, subject: []const u8, kind: file.Kind) ?u32 {
+    pub fn first(s: *const Set, c: *Cache, subject: []const u8, kind: file.Kind) ?EntryIndex {
         var acc: Accumulator = .{ .set = s, .kind = kind, .mode = .first };
         s.run(c, subject, &acc);
-        return acc.best;
+        return if (acc.best) |index| .fromRaw(index) else null;
     }
 
     /// The highest matching index (gitignore's last match).
-    pub fn last(s: *const Set, c: *Cache, subject: []const u8, kind: file.Kind) ?u32 {
+    pub fn last(s: *const Set, c: *Cache, subject: []const u8, kind: file.Kind) ?EntryIndex {
         var acc: Accumulator = .{ .set = s, .kind = kind, .mode = .last };
         s.run(c, subject, &acc);
-        return acc.best;
+        return if (acc.best) |index| .fromRaw(index) else null;
     }
 
     /// Appends every matching index, ascending, without duplicates.
-    pub fn all(s: *const Set, gpa: Allocator, c: *Cache, subject: []const u8, kind: file.Kind, out: *std.ArrayList(u32)) Allocator.Error!void {
+    pub fn all(s: *const Set, gpa: Allocator, c: *Cache, subject: []const u8, kind: file.Kind, out: *std.ArrayList(EntryIndex)) Allocator.Error!void {
         const from = out.items.len;
         var acc: Accumulator = .{ .set = s, .kind = kind, .mode = .all, .gpa = gpa, .out = out };
         s.run(c, subject, &acc);
         if (acc.failed) return error.OutOfMemory;
         const added = out.items[from..];
-        std.mem.sortUnstable(u32, added, {}, std.sort.asc(u32));
+        std.mem.sortUnstable(EntryIndex, added, {}, indexLess);
         var n: usize = 0;
         for (added) |x| {
             if (n > 0 and added[n - 1] == x) continue;
@@ -342,7 +358,7 @@ pub const Set = struct {
             end: usize,
             /// The last entry matching this prefix; a proper prefix counts
             /// as a directory.
-            last: ?u32,
+            last: ?EntryIndex,
             /// Whether something below this prefix could still match.
             leads: bool,
         };
@@ -373,7 +389,7 @@ pub const Set = struct {
                 leads = leads or automaton_leads;
             }
             if (whole) a.done = true else a.at = end + 1;
-            return .{ .end = end, .last = acc.best, .leads = leads };
+            return .{ .end = end, .last = if (acc.best) |index| .fromRaw(index) else null, .leads = leads };
         }
     };
 
@@ -389,6 +405,7 @@ pub const Set = struct {
 };
 
 /// Collects matching entries for one query.
+// aegis: measured-boundary: docs/design.md#safety-boundaries; kernels offer validated entry indices; typed public results are constructed at this boundary.
 pub const Accumulator = struct {
     set: *const Set,
     kind: file.Kind,
@@ -396,7 +413,7 @@ pub const Accumulator = struct {
     found: bool = false,
     best: ?u32 = null,
     gpa: ?Allocator = null,
-    out: ?*std.ArrayList(u32) = null,
+    out: ?*std.ArrayList(EntryIndex) = null,
     failed: bool = false,
 
     /// Whether entry `index` counts for this kind of subject.
@@ -412,7 +429,7 @@ pub const Accumulator = struct {
             .any => {},
             .first => acc.best = if (acc.best) |b| @min(b, index) else index,
             .last => acc.best = if (acc.best) |b| @max(b, index) else index,
-            .all => acc.out.?.append(acc.gpa.?, index) catch {
+            .all => acc.out.?.append(acc.gpa.?, .fromRaw(index)) catch {
                 acc.failed = true;
             },
         }
@@ -439,9 +456,10 @@ const Part = struct {
     reading: program_mod.Reading,
     strategies: tables.Strategies,
     automaton: lazy.Automaton,
+    // aegis: design: docs/design.md#safety-boundaries; this private entry index is installed only from the validated insertion-order enumeration.
     single: ?struct { source: []u8, compiled: direct.Compiled, index: u32 } = null,
 
-    fn build(gpa: Allocator, entries: []const Builder.Stored, reading: program_mod.Reading) Allocator.Error!Part {
+    fn build(gpa: Allocator, entries: []const Builder.Stored, reading: program_mod.Reading) BuildError!Part {
         var strategies: tables.Strategies = try .build(gpa, entries, reading);
         errdefer strategies.deinit(gpa);
         var automaton: lazy.Automaton = try .build(gpa, entries, reading);
@@ -470,3 +488,7 @@ const Part = struct {
         p.* = undefined;
     }
 };
+
+fn indexLess(_: void, a: EntryIndex, b: EntryIndex) bool {
+    return a.compare(b) == .lt;
+}

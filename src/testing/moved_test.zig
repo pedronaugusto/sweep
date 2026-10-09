@@ -1,7 +1,7 @@
 //! The glob tests of the packages sweep replaces, kept as they move in.
 //! Rows whose answer changed carry the reason.
 const std = @import("std");
-const sweep = @import("../sweep.zig");
+const sweep = @import("../glob.zig");
 
 /// gantry's path rules: git's dialect with the basename rule.
 fn pathRule(pattern: []const u8, subject: []const u8) bool {
@@ -84,9 +84,9 @@ const Lookout = struct {
         for (only) |p| _ = try b_only.add(p, .{ .options = options });
         const l = try gpa.create(Lookout);
         l.* = .{ .ignore = try b_ignore.build(), .absolute = try b_absolute.build(), .only = try b_only.build(), .cache = undefined };
-        l.cache[0] = try .init(gpa, &l.ignore, .{ .capacity = 1 << 16 });
-        l.cache[1] = try .init(gpa, &l.absolute, .{ .capacity = 1 << 16 });
-        l.cache[2] = try .init(gpa, &l.only, .{ .capacity = 1 << 16 });
+        l.cache[0] = try .init(gpa, &l.ignore, .{ .capacity = .fromRaw(1 << 16) });
+        l.cache[1] = try .init(gpa, &l.absolute, .{ .capacity = .fromRaw(1 << 16) });
+        l.cache[2] = try .init(gpa, &l.only, .{ .capacity = .fromRaw(1 << 16) });
         return l;
     }
 
@@ -107,7 +107,7 @@ const Lookout = struct {
 
     fn ignored(l: *Lookout, root: []const u8, path: []const u8) bool {
         return underMatch(&l.ignore, &l.cache[0], relative(root, path)) or
-            (l.absolute.len() > 0 and underMatch(&l.absolute, &l.cache[1], path));
+            (l.absolute.len().raw() > 0 and underMatch(&l.absolute, &l.cache[1], path));
     }
 
     fn relative(root: []const u8, path: []const u8) []const u8 {
@@ -117,13 +117,13 @@ const Lookout = struct {
     fn excludes(l: *Lookout, root: []const u8, path: []const u8) bool {
         if (path.len == root.len) return false;
         if (l.ignored(root, path)) return true;
-        if (l.only.len() == 0) return false;
+        if (l.only.len().raw() == 0) return false;
         return !underMatch(&l.only, &l.cache[2], relative(root, path));
     }
 
     fn prunes(l: *Lookout, root: []const u8, dir: []const u8) bool {
         if (l.ignored(root, dir)) return true;
-        if (l.only.len() == 0) return false;
+        if (l.only.len().raw() == 0) return false;
         const rel = relative(root, dir);
         if (underMatch(&l.only, &l.cache[2], rel)) return false;
         return !l.only.leadsTo(&l.cache[2], rel);
