@@ -39,13 +39,14 @@ pub fn build(b: *std.Build) !void {
     check.dependOn(&library.step);
     const domains = b.step("check-domains", "Reject mixed entry identities, counts and capacities");
     for ([_][]const u8{ "index", "capacity" }) |name| {
+        const source = b.pathJoin(&.{ "ci", "types", b.fmt("{s}.zig", .{name}) });
         const negative = b.addObject(.{ .name = b.fmt("reject-{s}", .{name}), .root_module = b.createModule(.{
-            .root_source_file = b.path(b.fmt("ci/types/{s}.zig", .{name})),
+            .root_source_file = b.path(source),
             .target = target,
             .optimize = optimize,
             .imports = &.{.{ .name = "sweep.glob", .module = concerns.glob }},
         }) });
-        negative.expect_errors = .{ .starts_with = if (std.mem.eql(u8, name, "index")) "ci/types/index.zig:3:47: error: expected type 'id.Identity(" else "ci/types/capacity.zig:3:72: error: expected type 'units.Bytes(" };
+        negative.expect_errors = .{ .starts_with = b.fmt("{s}:3:{d}: error: expected type '{s}(", .{ source, @as(u8, if (std.mem.eql(u8, name, "index")) 47 else 72), if (std.mem.eql(u8, name, "index")) "id.Identity" else "units.Bytes" }) };
         domains.dependOn(&negative.step);
     }
     check.dependOn(domains);
