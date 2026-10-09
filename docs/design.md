@@ -233,3 +233,9 @@ There are no secrets, locks beside shared data, or foreign numeric identities
 in the pure matcher. Aegis's currently published API supplies no input marker
 or owned compilation container; validation and cleanup remain with sweep's
 existing parser and explicit allocating owners. No speculative layer is added.
+
+The package preflight configuration selects Glint A004 as a gate for adopted
+identity, unit and integer domains. Its source selection includes tests, benchmarks,
+examples and CI drivers. The pinned published preflight predates Glint orchestration,
+and published Glint G3 admits aegis reports only; these gate settings await G4
+execution. Compiler rejection checks already enforce the public domain distinctions.

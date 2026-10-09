@@ -62,5 +62,21 @@
     ]
   ],
   "unreachable_exceptions": "ci/unreachable-exceptions.json",
-  "debug_print_exceptions": "ci/debug-print-exceptions.json"
+  "debug_print_exceptions": "ci/debug-print-exceptions.json",
+  "glint": {
+    "profile": "none",
+    "rules": [
+      {
+        "id": "A004",
+        "level": "gate"
+      }
+    ]
+  },
+  "glint_paths": [
+    "src",
+    "bench",
+    "examples",
+    "ci",
+    "build.zig"
+  ]
 }

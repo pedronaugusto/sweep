@@ -179,7 +179,7 @@ test "alternate separators stop ancestor prefixes at original byte offsets" {
             try t.expectEqual(@as(?sweep.Set.Index, null), dir.last);
             const entry = prefixes.next().?;
             try t.expectEqual(@as(usize, 9), entry.end);
-            try t.expectEqual(@as(?u32, 0), entry.last);
+            try t.expectEqual(@as(?sweep.Set.Index, .fromRaw(0)), entry.last);
             const tail = prefixes.next().?;
             try t.expectEqual(subject.len, tail.end);
             try t.expectEqual(@as(?sweep.Set.Index, null), tail.last);
