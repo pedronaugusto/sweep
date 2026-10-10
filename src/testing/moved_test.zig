@@ -107,7 +107,7 @@ const Lookout = struct {
 
     fn ignored(l: *Lookout, root: []const u8, path: []const u8) bool {
         return underMatch(&l.ignore, &l.cache[0], relative(root, path)) or
-            (l.absolute.len().raw() > 0 and underMatch(&l.absolute, &l.cache[1], path));
+            (!l.absolute.len().eql(.fromRaw(0)) and underMatch(&l.absolute, &l.cache[1], path));
     }
 
     fn relative(root: []const u8, path: []const u8) []const u8 {
@@ -117,13 +117,13 @@ const Lookout = struct {
     fn excludes(l: *Lookout, root: []const u8, path: []const u8) bool {
         if (path.len == root.len) return false;
         if (l.ignored(root, path)) return true;
-        if (l.only.len().raw() == 0) return false;
+        if (l.only.len().eql(.fromRaw(0))) return false;
         return !underMatch(&l.only, &l.cache[2], relative(root, path));
     }
 
     fn prunes(l: *Lookout, root: []const u8, dir: []const u8) bool {
         if (l.ignored(root, dir)) return true;
-        if (l.only.len().raw() == 0) return false;
+        if (l.only.len().eql(.fromRaw(0))) return false;
         const rel = relative(root, dir);
         if (underMatch(&l.only, &l.cache[2], rel)) return false;
         return !l.only.leadsTo(&l.cache[2], rel);
