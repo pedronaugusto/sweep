@@ -51,17 +51,12 @@ pub const layers: []const gantry.rules.Layer = &.{
 
 pub const entries: []const []const u8 = &.{};
 
-pub const modules: []const gantry.NamedModule = &.{
-    .{ .name = "sweep.glob", .path = "src/glob.zig" },
-    .{ .name = "sweep.walk", .path = "src/walk.zig" },
-};
+pub const modules: []const gantry.NamedModule = &.{};
 
 const package_references = [_]gantry.rules.ReferenceRule{
     .{ .name = "named dependencies", .unresolved_only = true, .except_targets = &.{
         "std",
         "aegis",
-        "sweep.glob",
-        "sweep.walk",
         "shakedown",
         "preflight_rules",
     } },

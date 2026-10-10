@@ -3,9 +3,7 @@
     "src"
   ],
   "test_roots": [
-    "src/tests.zig",
-    "src/glob.zig",
-    "src/walk.zig"
+    "src/tests.zig"
   ],
   "test_support": [
     "src/testing/**"

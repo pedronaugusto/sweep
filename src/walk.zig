@@ -1,7 +1,7 @@
 //! Optional filesystem expansion. The matcher stays pure; the walk owns
 //! directory handles and path buffers and takes Io on every blocking call.
 const std = @import("std");
-const glob = @import("sweep.glob");
+const glob = @import("glob.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 

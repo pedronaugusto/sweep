@@ -1,6 +1,6 @@
 //! Path globs and optional filesystem expansion.
-pub const glob = @import("sweep.glob");
-pub const walk = @import("sweep.walk");
+pub const glob = @import("glob.zig");
+pub const walk = @import("walk.zig");
 
 pub const Syntax = glob.Syntax;
 pub const Case = glob.Case;

@@ -19,9 +19,14 @@ or a performance target met.
 below are ordered from lowest to highest; imports stay within a layer or go
 downward. Paths are under `src/`. Tests have their own dependency graph;
 shakedown and preflight are lazy test/build dependencies, outside a consumer's
-runtime closure. Consumers may import `sweep.glob` alone;
-`sweep.walk` depends on it, and `sweep` imports both. The same build module
-instances are shared, so importing the root and concerns preserves type identity.
+runtime closure. The package is one build module, `sweep`, with the namespaces
+`sweep.glob` and `sweep.walk`. A second module would buy something only if a part
+had dependencies other users should not fetch or must not link something, and
+neither part does: aegis is the package's, and the walk adds only `std.Io`, which
+Zig analyses where a program names it. A program that only matches therefore
+never compiles the walk, and `zig build check-freestanding` proves the matching
+calls build for wasm32-freestanding. The layering below is enforced at file
+level by [ci/layers.zig](../ci/layers.zig), not by module boundaries.
 
 | Layer | Files and responsibility |
 |---|---|
@@ -35,8 +40,8 @@ instances are shared, so importing the root and concerns preserves type identity
 | Sets | `set.zig` owns entry order, immutable partitions and query aggregation. |
 | Line grammar | `gitignore.zig` parses a borrowed line; files, levels and precedence stay outside sweep. |
 | Walking | `walk.zig` owns traversal state above Pattern/Set pruning. |
-| Concern facades | `glob.zig` exposes pure computation as `sweep.glob`; `walk.zig` exposes optional filesystem expansion as `sweep.walk` and imports only `sweep.glob`. |
-| Public facade | `sweep.zig` reexports these concern identities as `sweep`, without becoming their state owner. |
+| Concern facades | `glob.zig` exposes pure computation as the namespace `sweep.glob`; `walk.zig` exposes optional filesystem expansion as `sweep.walk` and imports only `glob.zig`. |
+| Public facade | `sweep.zig` is the module root: it exposes both namespaces and reexports their names at the root, without becoming their state owner. |
 
 `Pattern` owns its compiled program and copied source. Its ordinary queries use
 local scratch, so threads share no mutable matching state. `Set` owns immutable

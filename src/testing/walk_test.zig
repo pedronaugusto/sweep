@@ -1,5 +1,5 @@
 const std = @import("std");
-const sweep = @import("sweep.glob");
+const sweep = @import("../glob.zig");
 const walking = @import("../walk.zig");
 const shakedown = @import("shakedown");
 const gpa = std.testing.allocator;

@@ -17,11 +17,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `PatternTooLong` when combined construction arithmetic or the emitted
   program exceeds its limit.
 - Runtime dependencies now include the std-only aegis safety library.
+- `sweep.glob` and `sweep.walk` are no longer build modules: the package
+  exposes the one module `sweep`, and both are namespaces in it. Code that
+  imports `sweep` is unchanged (`sweep.glob.Pattern`, `sweep.Walk` and every
+  other path stay); code that did `b.dependency("sweep", ...).module("sweep.glob")`
+  or `@import("sweep.walk")` imports `sweep` and uses `sweep.glob` or
+  `sweep.walk`.
 
 ### Added
 
-- `sweep.glob` and `sweep.walk` build modules expose the existing computation
-  and filesystem concerns independently; `sweep` reexports the same identities.
+- `sweep.glob` (pure computation) and `sweep.walk` (filesystem expansion) are
+  namespaces of the `sweep` module, and `sweep` reexports their names. A
+  program that only matches never analyses the walk.
 - Distinct program positions, source-byte offsets and allocation element counts;
   ranged accept encoding and all-mode checked construction/capture arithmetic.
 - Check individual, combined and tagged construction arithmetic in every mode;

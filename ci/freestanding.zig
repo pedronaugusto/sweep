@@ -2,7 +2,7 @@
 //! `zig build check-freestanding`, and its exports reach every public
 //! query, while filesystem expansion stays in its optional Io layer.
 const std = @import("std");
-const sweep = @import("sweep.glob");
+const sweep = @import("sweep");
 
 var heap: [1 << 20]u8 = undefined;
 

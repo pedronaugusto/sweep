@@ -17,8 +17,9 @@ git+https://github.com/pedronaugusto/sweep`, then obtain the `sweep` module thro
 std-only aegis safety library
 at runtime. Its matching and capture APIs build for every target,
 wasm32-freestanding included. Optional filesystem expansion uses `std.Io`.
-The root `sweep` module is a facade over `sweep.glob` (pure matching and Unicode
-transforms) and `sweep.walk` (filesystem expansion), each available alone.
+There is one module, `sweep`, with two namespaces: `sweep.glob` (pure matching
+and Unicode transforms) and `sweep.walk` (filesystem expansion); the common
+names are also at the root. A program that only matches never compiles the walk.
 See [the design](docs/design.md) for ownership, layers and matching bounds.
 
 ## Usage

@@ -1,4 +1,5 @@
 test {
-    _ = @import("sweep.glob");
-    _ = @import("sweep.walk");
+    _ = @import("sweep.zig");
+    _ = @import("glob.zig");
+    _ = @import("walk.zig");
 }
