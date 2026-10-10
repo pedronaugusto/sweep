@@ -89,6 +89,8 @@ pub const singles = [_]struct { []const u8, bool }{
     .{ "**/kernel/**/*.c", false },
     .{ "net/*/*.c", false },
     .{ "**/README*", false },
+    .{ "**/test/**", false },
+    .{ "*", true },
     .{ "*/*/*/*.json", false },
     .{ "[a-m]*/**/*.go", false },
 };

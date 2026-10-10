@@ -23,7 +23,7 @@ pub fn hashable(s: Strategy, reading: Reading) bool {
         .ends => lit.len > 1 and lit[0] == '.' and std.mem.findAny(u8, lit[1..], &.{ '.', sep_byte }) == null,
         .starts => lit.len > 0 and lit[lit.len - 1] == sep_byte,
         .starts_component => true,
-        .basename_starts => false,
+        .basename_starts, .within => false,
     };
 }
 
@@ -187,7 +187,7 @@ pub const Strategies = struct {
                     if (seps == 0) try basename.append(gpa, pair) else try suffix.append(gpa, .{ .components = seps + 1, .pair = pair });
                 },
                 .starts_component => try component.append(gpa, pair),
-                .basename_starts => unreachable,
+                .basename_starts, .within => unreachable,
             }
         }
         s.exact = try .build(gpa, reading, exact.items);

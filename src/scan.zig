@@ -20,8 +20,23 @@ pub const max_entries = 32;
 const How = union(enum) {
     /// By comparing bytes.
     literal: Strategy,
-    /// By reading its text, which `source` borrows from the scan's bytes.
-    text: struct { source: []const u8, compiled: direct.Compiled },
+    /// By reading its text, once the bytes every match starts and ends
+    /// with are found; all of these borrow from the scan's bytes.
+    text: Text,
+};
+
+const Text = struct {
+    source: []const u8,
+    head: []const u8,
+    tail: []const u8,
+    compiled: direct.Compiled,
+
+    fn matches(t: Text, reading: program_mod.Reading, subject: []const u8) bool {
+        if (subject.len < t.head.len + t.tail.len) return false;
+        return strategy_mod.eql(reading, subject[0..t.head.len], t.head) and
+            strategy_mod.eql(reading, subject[subject.len - t.tail.len ..], t.tail) and
+            t.compiled.matches(t.source, subject);
+    }
 };
 
 const Member = struct {
@@ -50,7 +65,7 @@ pub const Scan = struct {
             if (e.strategy) |s| {
                 size += s.literal.len;
             } else if (decide(e)) |_| {
-                size += e.pattern.len;
+                size += e.pattern.len + e.affixes.len;
             } else return null;
         }
         const members = try gpa.alloc(Member, count);
@@ -66,8 +81,12 @@ pub const Scan = struct {
                 break :literal .{ .literal = .{ .kind = s.kind, .literal = bytes[at - s.literal.len .. at] } };
             } else text: {
                 @memcpy(bytes[at..][0..e.pattern.len], e.pattern);
+                const source = bytes[at..][0..e.pattern.len];
                 at += e.pattern.len;
-                break :text .{ .text = .{ .source = bytes[at - e.pattern.len .. at], .compiled = decide(e).? } };
+                @memcpy(bytes[at..][0..e.affixes.len], e.affixes);
+                const affixes = bytes[at..][0..e.affixes.len];
+                at += e.affixes.len;
+                break :text .{ .text = .{ .source = source, .head = affixes[0..e.head_len], .tail = affixes[e.head_len..], .compiled = decide(e).? } };
             };
             // safe: the set counted its entries against max_entries.
             members[n] = .{ .index = @intCast(index), .how = how };
@@ -104,7 +123,7 @@ pub const Scan = struct {
         if (!acc.counts(m.index)) return false;
         const hit = switch (m.how) {
             .literal => |strategy| strategy.matches(s.reading, subject),
-            .text => |text| text.compiled.matches(text.source, subject),
+            .text => |text| text.matches(s.reading, subject),
         };
         if (hit) acc.offer(m.index);
         return hit;

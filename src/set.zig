@@ -60,6 +60,17 @@ pub const Builder = struct {
         strategy: ?strategy_mod.Strategy,
         /// Whether the strategy is in the hashed tables rather than the automaton.
         hashed: bool = false,
+        /// Without a strategy, the canonical bytes every match starts with,
+        /// then those it ends with: what a scan checks before reading the
+        /// pattern. Kept only for the first `scan.max_entries` entries.
+        affixes: []u8 = &.{},
+        head_len: usize = 0,
+
+        fn free(e: Stored, gpa: Allocator) void {
+            gpa.free(e.pattern);
+            if (e.strategy) |s| gpa.free(s.literal);
+            gpa.free(e.affixes);
+        }
     };
 
     /// An empty builder whose entries and set come from `gpa`.
@@ -69,10 +80,7 @@ pub const Builder = struct {
 
     /// Frees the entries not yet built.
     pub fn deinit(b: *Builder) void {
-        for (b.entries.items) |e| {
-            b.gpa.free(e.pattern);
-            if (e.strategy) |s| b.gpa.free(s.literal);
-        }
+        for (b.entries.items) |e| e.free(b.gpa);
         b.entries.deinit(b.gpa);
         b.* = undefined;
     }
@@ -117,6 +125,21 @@ pub const Builder = struct {
             stored.strategy = .{ .kind = kind, .literal = try lit.toOwnedSlice(gpa) };
         }
         errdefer if (stored.strategy) |s| gpa.free(s.literal);
+        if (stored.strategy == null and b.entries.items.len < scan_mod.max_entries) {
+            var storage: [128]u8 = undefined;
+            var scratch: std.heap.BufferFirstAllocator = .init(&storage, gpa);
+            const buffer = scratch.allocator();
+            var affixes: std.ArrayList(u8) = .empty;
+            defer affixes.deinit(buffer);
+            try strategy_mod.bytes(buffer, program, 0, shape.head, &affixes);
+            const head_len = affixes.items.len;
+            try strategy_mod.bytes(buffer, program, shape.tail_start, program.nodes.len - 1, &affixes);
+            if (affixes.items.len > 0) {
+                stored.affixes = try gpa.dupe(u8, affixes.items);
+                stored.head_len = head_len;
+            }
+        }
+        errdefer gpa.free(stored.affixes);
         try b.entries.append(gpa, stored);
         return .fromRaw(@intCast(b.entries.items.len - 1)); // safe: max_entries checked before insertion
     }
@@ -126,10 +149,7 @@ pub const Builder = struct {
     pub fn build(b: *Builder) BuildError!Set {
         const gpa = b.gpa;
         defer {
-            for (b.entries.items) |e| {
-                gpa.free(e.pattern);
-                if (e.strategy) |s| gpa.free(s.literal);
-            }
+            for (b.entries.items) |e| e.free(gpa);
             b.entries.clearRetainingCapacity();
         }
         const entries = b.entries.items;

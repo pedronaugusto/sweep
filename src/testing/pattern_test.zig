@@ -5,6 +5,7 @@ const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
 const repeat = @import("shakedown").corpus.repeat;
 const pattern_mod = @import("../pattern.zig");
+const strategy_mod = @import("../strategy.zig");
 
 // The property loops build thousands of patterns; the testing allocator's
 // bookkeeping would dominate them. Leaks and failures are allocation_test's.
@@ -207,4 +208,74 @@ test "a pattern at the longest runs its NFA on the stack, and a longer one is a 
     defer cache.deinit();
     try std.testing.expect(set.any(&cache, yes ++ "x", .file));
     try std.testing.expect(!set.any(&cache, yes, .file));
+}
+
+/// Every subject of up to `max` bytes over `alphabet`.
+fn allSubjects(comptime alphabet: []const u8, comptime max: usize, check: anytype) !void {
+    var buf: [max]u8 = undefined;
+    var digits: [max]usize = undefined;
+    for (0..max + 1) |len| {
+        @memset(digits[0..len], 0);
+        while (true) {
+            for (buf[0..len], digits[0..len]) |*byte, d| byte.* = alphabet[d];
+            try check.run(buf[0..len]);
+            var i: usize = 0;
+            while (i < len) : (i += 1) {
+                digits[i] += 1;
+                if (digits[i] < alphabet.len) break;
+                digits[i] = 0;
+            }
+            if (i == len) break;
+        }
+    }
+}
+
+test "a component run then anything, and every subject, are literal strategies" {
+    const cases = [_]struct { pattern: []const u8, options: sweep.Options = .{}, kind: strategy_mod.Kind }{
+        .{ .pattern = "**/a/**", .kind = .within },
+        .{ .pattern = "**/a/b/**", .kind = .within },
+        .{ .pattern = "**/a/**", .options = .{ .case = .ascii }, .kind = .within },
+        .{ .pattern = "**/*", .kind = .starts },
+        .{ .pattern = "*", .options = .{ .anywhere = true }, .kind = .starts },
+    };
+    for (cases) |case| {
+        var p: Pattern = try .compile(gpa, case.pattern, case.options);
+        defer p.deinit();
+        try std.testing.expectEqual(case.kind, p.strategy.?.kind);
+        const Check = struct {
+            p: *const Pattern,
+            pattern: []const u8,
+            options: sweep.Options,
+            const Self = @This();
+            fn run(c: Self, subject: []const u8) !void {
+                const want = try sweep.match(c.pattern, subject, c.options);
+                for ([_]pattern_mod.Executor{ .fastest, .strategy, .dfa, .nfa }) |executor| {
+                    if (pattern_mod.matchesBy(c.p, subject, executor) != want) {
+                        std.debug.print("\"{f}\" vs \"{f}\" ({any}) {t}: want {}\n", .{ std.zig.fmtString(c.pattern), std.zig.fmtString(subject), c.options, executor, want });
+                        return error.TestUnexpectedResult;
+                    }
+                }
+            }
+        };
+        const check: Check = .{ .p = &p, .pattern = case.pattern, .options = case.options };
+        try allSubjects("abA/.", 7, check);
+        // Longer than a block of the vector search, with the literal at every offset.
+        var prng: std.Random.DefaultPrng = .init(0x717_717);
+        var long: [96]u8 = undefined;
+        for (0..4000) |_| {
+            const len = prng.random().uintLessThan(usize, long.len + 1);
+            for (long[0..len]) |*byte| byte.* = "abA//."[prng.random().uintLessThan(usize, 6)];
+            try check.run(long[0..len]);
+        }
+    }
+}
+
+test "a component run then anything is not a strategy where it differs" {
+    // A wildcard in the run, a run that starts with a separator, one that
+    // leaves the last component open, and one the automaton reads.
+    for ([_][]const u8{ "**/a*/**", "**//a/**", "**/a/*", "**/a/b", "**/[a]/**", "**/a\\/**" }) |text| {
+        var p: Pattern = try .compile(gpa, text, .{});
+        defer p.deinit();
+        if (p.strategy) |s| try std.testing.expect(s.kind != .within);
+    }
 }

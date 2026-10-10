@@ -23,6 +23,9 @@ pub const Kind = enum {
     tail,
     /// The last component starts with the literal (`**/lit*`).
     basename_starts,
+    /// The subject holds the literal, which starts and ends with a separator,
+    /// or starts with it less its first separator (`**/lit/**`).
+    within,
 };
 
 pub const Strategy = struct {
@@ -40,6 +43,7 @@ pub const Strategy = struct {
                 std.mem.findScalar(u8, subject[lit.len..], separatorByte(reading)) == null,
             .ends => subject.len >= lit.len and eql(reading, subject[subject.len - lit.len ..], lit),
             .tail => tail(reading, subject, lit),
+            .within => within(reading, subject, lit),
             .basename_starts => blk: {
                 const start = if (std.mem.findScalarLast(u8, subject, separatorByte(reading))) |at| at + 1 else 0;
                 const base = subject[start..];
@@ -48,6 +52,45 @@ pub const Strategy = struct {
         };
     }
 };
+
+fn within(reading: program_mod.Reading, subject: []const u8, lit: []const u8) bool {
+    const inner = lit[1..];
+    if (subject.len >= inner.len and eql(reading, subject[0..inner.len], inner)) return true;
+    if (!reading.fold) return contains(subject, lit);
+    var at: usize = 0;
+    while (at + lit.len <= subject.len) : (at += 1) {
+        if (eql(reading, subject[at..][0..lit.len], lit)) return true;
+    }
+    return false;
+}
+
+/// Whether `subject` holds `needle`, which has at least two bytes. Blocks
+/// are tested for the first two bytes together: a separator followed by a
+/// letter is rare enough that the checks that follow seldom run, where a
+/// loop over the bytes mispredicts at every separator.
+fn contains(subject: []const u8, needle: []const u8) bool {
+    if (subject.len < needle.len) return false;
+    const last = subject.len - needle.len;
+    var at: usize = 0;
+    if (std.simd.suggestVectorLength(u8)) |n| {
+        const first: @Vector(n, u8) = @splat(needle[0]);
+        const second: @Vector(n, u8) = @splat(needle[1]);
+        // A block's bytes and the ones after them are all in the subject.
+        while (at + n < subject.len) : (at += n) {
+            const here: @Vector(n, u8) = subject[at..][0..n].*;
+            const next: @Vector(n, u8) = subject[at + 1 ..][0..n].*;
+            var starts: @Int(.unsigned, n) = @bitCast((here == first) & (next == second));
+            while (starts != 0) : (starts &= starts - 1) {
+                const found = at + @ctz(starts);
+                if (found <= last and std.mem.eql(u8, subject[found..][0..needle.len], needle)) return true;
+            }
+        }
+    }
+    while (at <= last) : (at += 1) {
+        if (subject[at] == needle[0] and std.mem.eql(u8, subject[at..][0..needle.len], needle)) return true;
+    }
+    return false;
+}
 
 fn tail(reading: program_mod.Reading, subject: []const u8, lit: []const u8) bool {
     if (subject.len < lit.len or !eql(reading, subject[subject.len - lit.len ..], lit)) return false;
@@ -128,6 +171,8 @@ pub fn recognise(p: Program) Shape {
             var j = rest;
             while (j < n and nodes[j].op == .lit) j += 1;
             if (j == n and j > rest) return .{ .strategy = .ends, .first = rest, .end = n };
+            // `**/*`: every subject.
+            if (n == 3) return .{ .strategy = .starts, .first = 0, .end = 0 };
             return shape;
         }
         var j = rest;
@@ -135,6 +180,12 @@ pub fn recognise(p: Program) Shape {
         if (j == n - 1 and j > rest and nodes[n - 1].op == .star and nodes[n - 1].arg == 0 and allLiterals(nodes[rest..j]))
             return .{ .strategy = .basename_starts, .first = rest, .end = j };
         if (j == n and j > rest and nodes[rest].op != .sep) return .{ .strategy = .tail, .first = rest, .end = n };
+    }
+    // `**/lit/**`: whole components, then anything.
+    if (n >= 5 and nodes[0].op == .gstar and nodes[1].op == .sep and nodes[1].arg == 0 and nodes[2].op != .sep and nodes[n - 2].op == .sep and nodes[n - 2].arg == 0 and nodes[n - 1].op == .gstar) {
+        var j: usize = 2;
+        while (j < n - 1 and isLit(nodes[j])) j += 1;
+        if (j == n - 1) return .{ .strategy = .within, .first = 1, .end = n - 1 };
     }
     // A text-mode `*lit`.
     if (n >= 2 and nodes[0].op == .star and nodes[0].arg == 1) {
