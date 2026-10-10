@@ -94,8 +94,16 @@ pub const Classes = struct {
         // Every distinction a node makes.
         classes = refiner.split(ids, classes, reps, p, .separator, 0);
         classes = refiner.split(ids, classes, reps, p, .dot, 0);
+        // A literal already split on leaves the classes as they are.
+        var split_on: [256]bool = @splat(false);
         for (p.nodes, 0..) |node, k| switch (node.op) {
-            .lit => classes = refiner.split(ids, classes, reps, p, .literal, k),
+            .lit => {
+                if (node.arg < split_on.len) {
+                    if (split_on[node.arg]) continue;
+                    split_on[node.arg] = true;
+                }
+                classes = refiner.split(ids, classes, reps, p, .literal, k);
+            },
             .class => classes = refiner.split(ids, classes, reps, p, .class, k),
             else => {},
         };
