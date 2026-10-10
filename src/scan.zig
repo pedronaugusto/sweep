@@ -60,15 +60,17 @@ pub const Scan = struct {
     pub fn build(gpa: Allocator, entries: anytype, reading: program_mod.Reading) Allocator.Error!?Scan {
         var count: usize = 0;
         var size: usize = 0;
+        var readers: [max_entries]direct.Compiled = undefined;
         for (entries) |e| {
             if (!e.reading.eql(reading)) continue;
-            count += 1;
-            if (count > max_entries) return null;
+            if (count == max_entries) return null;
             if (e.strategy) |s| {
                 size += s.literal.len;
-            } else if (decide(e)) |_| {
+            } else if (decide(e)) |reader| {
+                readers[count] = reader;
                 size += e.pattern.len + e.affixes.len;
             } else return null;
+            count += 1;
         }
         const members = try gpa.alloc(Member, count);
         errdefer gpa.free(members);
@@ -88,7 +90,7 @@ pub const Scan = struct {
                 @memcpy(bytes[at..][0..e.affixes.len], e.affixes);
                 const affixes = bytes[at..][0..e.affixes.len];
                 at += e.affixes.len;
-                break :text .{ .text = .{ .source = source, .head = affixes[0..e.head_len], .tail = affixes[e.head_len..], .compiled = decide(e).? } };
+                break :text .{ .text = .{ .source = source, .head = affixes[0..e.head_len], .tail = affixes[e.head_len..], .compiled = readers[n] } };
             };
             // safe: the set counted its entries against max_entries.
             members[n] = .{ .index = @intCast(index), .how = how };
