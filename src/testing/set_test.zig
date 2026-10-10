@@ -4,6 +4,7 @@
 const std = @import("std");
 const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
+const shake = @import("shakedown");
 const scan = @import("../scan.zig");
 const repeat = @import("shakedown").corpus.repeat;
 
@@ -36,7 +37,7 @@ const Fixture = struct {
     }
 };
 
-fn fixture(s: gen.Source, count: usize, pieces: []const []const u8) !Fixture {
+fn fixture(s: *shake.Source, count: usize, pieces: []const []const u8) !Fixture {
     var builder: Set.Builder = .init(gpa);
     defer builder.deinit();
     var patterns: std.ArrayList(Pattern) = .empty;
@@ -55,7 +56,7 @@ fn fixture(s: gen.Source, count: usize, pieces: []const []const u8) !Fixture {
         var options = gen.options(s);
         options.syntax.separator = first.syntax.separator;
         const pattern = gen.string(s, &buf, pieces);
-        const entry: Set.Entry = .{ .options = options, .dir_only = s.oneIn(4) };
+        const entry: Set.Entry = .{ .options = options, .dir_only = gen.oneIn(s, 4) };
         const index = builder.add(pattern, entry) catch |err| switch (err) {
             error.InvalidPattern => continue,
             else => return err,
@@ -68,15 +69,16 @@ fn fixture(s: gen.Source, count: usize, pieces: []const []const u8) !Fixture {
     return .{ .set = try builder.build(), .patterns = patterns, .dir_only = dir_only, .texts = texts };
 }
 
-fn queriesOne(s: gen.Source) anyerror!void {
-    var f = try fixture(s, 1 + s.index(8), &gen.any_pattern);
+fn queriesOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
+    var f = try fixture(s, 1 + gen.index(s, 8), &gen.any_pattern);
     defer f.deinit();
-    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(if (s.oneIn(2)) 0 else 1 << 17) });
+    var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(if (gen.oneIn(s, 2)) 0 else 1 << 17) });
     defer cache.deinit();
     for (0..4) |_| {
         var text_buf: [16]u8 = undefined;
         const text = gen.string(s, &text_buf, &gen.any_text);
-        const kind: sweep.Kind = if (s.value(bool)) .dir else .file;
+        const kind: sweep.Kind = if (gen.value(s, bool)) .dir else .file;
         // As built, these entries are scanned.
         try agrees(&f, &cache, text, kind);
         // The same set with its scans set aside answers from the hashed
@@ -147,26 +149,23 @@ fn ancestorsAgree(f: *const Fixture, cache: *Set.Cache, text: []const u8, kind: 
     try std.testing.expect(it.next() == null);
 }
 
-test "fuzz: a set equals its entries one by one" {
-    try std.testing.fuzz({}, gen.fuzzed(queriesOne), .{});
-}
-
-test "a set equals its entries one by one on seeded inputs" {
-    try gen.seeded(queriesOne, 0x5e7_5e7, 1500);
+test "a set equals its entries one by one" {
+    try shake.check(std.testing.allocator, {}, queriesOne, .{ .cases = 1500 });
 }
 
 /// gitignore-shaped entries, where every strategy applies.
 const ignore_pieces = [_][]const u8{ "a", "b", "/", "*", "**/", "/**", ".", "c", "*.c", "x", "a/b", "?" };
 
-fn strategiesOne(s: gen.Source) anyerror!void {
-    var f = try fixture(s, 1 + s.index(12), &ignore_pieces);
+fn strategiesOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
+    var f = try fixture(s, 1 + gen.index(s, 12), &ignore_pieces);
     defer f.deinit();
     var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(1 << 16) });
     defer cache.deinit();
     for (0..6) |_| {
         var text_buf: [16]u8 = undefined;
         const text = gen.string(s, &text_buf, &[_][]const u8{ "a", "b", "/", ".", "c", "x", "A", ".c" });
-        const kind: sweep.Kind = if (s.value(bool)) .dir else .file;
+        const kind: sweep.Kind = if (gen.value(s, bool)) .dir else .file;
         var want_last: ?Set.Index = null;
         for (0..f.patterns.items.len) |i| if (f.matches(i, text, kind)) {
             want_last = .fromRaw(@intCast(i));
@@ -179,8 +178,8 @@ fn strategiesOne(s: gen.Source) anyerror!void {
     }
 }
 
-test "hashed strategies equal the automaton on seeded inputs" {
-    try gen.seeded(strategiesOne, 0x57_4a7, 2000);
+test "hashed strategies equal the automaton" {
+    try shake.check(std.testing.allocator, {}, strategiesOne, .{ .cases = 2000 });
 }
 
 test "gitignore lines through a set: the last match decides" {

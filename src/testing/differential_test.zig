@@ -6,6 +6,7 @@ const dowild = @import("dowild.zig");
 const oracle = @import("oracle.zig");
 const t3070 = @import("t3070.zig");
 const gen = @import("gen.zig");
+const shake = @import("shakedown");
 
 const Answer = oracle.Answer;
 
@@ -43,7 +44,8 @@ test "t3070: every row in every mode" {
 }
 
 /// Holds sweep to git's `dowild` and to the oracle on one input.
-fn gitOne(s: gen.Source) anyerror!void {
+fn gitOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
     var pattern_buf: [24]u8 = undefined;
     var text_buf: [24]u8 = undefined;
     const pattern = gen.string(s, &pattern_buf, &gen.git_pattern);
@@ -71,7 +73,8 @@ fn gitOne(s: gen.Source) anyerror!void {
 }
 
 /// Holds sweep to the oracle under a random syntax, case and `anywhere`.
-fn dialectOne(s: gen.Source) anyerror!void {
+fn dialectOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
     var pattern_buf: [16]u8 = undefined;
     var text_buf: [16]u8 = undefined;
     const options = gen.options(s);
@@ -85,18 +88,10 @@ fn dialectOne(s: gen.Source) anyerror!void {
     }
 }
 
-test "fuzz: git dialects equal dowild and the oracle" {
-    try std.testing.fuzz({}, gen.fuzzed(gitOne), .{});
+test "git dialects equal dowild and the oracle" {
+    try shake.check(std.testing.allocator, {}, gitOne, .{ .cases = 5000 });
 }
 
-test "fuzz: every dialect equals the oracle" {
-    try std.testing.fuzz({}, gen.fuzzed(dialectOne), .{});
-}
-
-test "git dialects equal dowild and the oracle on seeded inputs" {
-    try gen.seeded(gitOne, 0x5eed_617, 5000);
-}
-
-test "every dialect equals the oracle on seeded inputs" {
-    try gen.seeded(dialectOne, 0x5eed_d1a1, 8000);
+test "every dialect equals the oracle" {
+    try shake.check(std.testing.allocator, {}, dialectOne, .{ .cases = 8000 });
 }
