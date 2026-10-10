@@ -42,7 +42,7 @@ pub fn compile(b: *program.Builder, interval: Interval) CompileError!void {
         if (lo == 0) try compiler.magnitude('-', 0, 0);
     }
     const end = b.node_len;
-    if (compiler.split) |split| b.nodes[split.raw()] = .{ .op = .jump, .arg = @intCast(split.raw() + 1) }; // safe: split precedes its emitted branch
+    if (compiler.split) |split| b.nodes[split.raw()] = .{ .op = .jump, .arg = try program.operandAfter(split, 1) };
     var jump = compiler.jumps;
     while (jump != program.no_jump) {
         const next = program.Position.fromRaw(b.nodes[jump.raw()].arg);
@@ -60,7 +60,7 @@ const Compiler = struct {
 
     fn branch(c: *Compiler) CompileError!void {
         if (c.split) |split| {
-            const jump = try c.b.emit(.jump, @intCast(c.jumps.raw())); // safe: emitted jump position or max_arg sentinel
+            const jump = try c.b.emit(.jump, try program.operand(c.jumps));
             c.jumps = jump;
             c.b.nodes[split.raw()].arg = @intCast(c.b.node_len); // safe: emit bounded every appended node
         }

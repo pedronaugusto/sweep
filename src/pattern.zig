@@ -87,7 +87,7 @@ pub const Pattern = struct {
             return compileLiteral(gpa, pattern, options);
         const bounds: program_mod.Bounds = try program_mod.Bounds.of(pattern, options);
         var storage: match_mod.Storage = undefined;
-        const small = bounds.nodes.raw() <= storage.nodes.len and bounds.classes.raw() <= storage.classes.len and bounds.ranges.raw() <= storage.ranges.len and bounds.frames.raw() <= storage.frames.len;
+        const small = bounds.fits(.{ .nodes = .fromRaw(storage.nodes.len), .classes = .fromRaw(storage.classes.len), .ranges = .fromRaw(storage.ranges.len), .frames = .fromRaw(storage.frames.len) });
         var b: program_mod.Builder = .{
             .nodes = if (small) &storage.nodes else try gpa.alloc(program_mod.Node, bounds.nodes.raw()),
             .classes = &.{},

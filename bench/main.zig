@@ -52,19 +52,25 @@ pub fn main(init: std.process.Init) !void {
     var buffer: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &buffer);
     const r: Report = .{ .w = &stdout.interface, .json = json, .io = init.io };
-    defer r.w.flush() catch {};
+    // The rows are the output: whichever of the run and the flush fails is reported, the run's first.
+    const ran = workloads(r, gpa, a, selected.items, smoke);
+    const flushed = r.w.flush();
+    try ran;
+    try flushed;
+}
 
+fn workloads(r: Report, gpa: Allocator, a: Allocator, selected: []const []const u8, smoke: bool) !void {
     const paths = try gen.tree(a, if (smoke) 2_000 else 100_000, 0x5eeb);
-    if (wanted(selected.items, "single")) try single(r, gpa, paths, smoke);
-    if (wanted(selected.items, "compile")) try compile(r, gpa, if (smoke) 1 else 2_000);
-    if (wanted(selected.items, "set")) for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
-    if (wanted(selected.items, "small")) try small(r, a, paths, smoke);
-    if (wanted(selected.items, "adversarial")) try adversarial(r, gpa, a, smoke);
-    if (wanted(selected.items, "long")) {
+    if (wanted(selected, "single")) try single(r, gpa, paths, smoke);
+    if (wanted(selected, "compile")) try compile(r, gpa, if (smoke) 1 else 2_000);
+    if (wanted(selected, "set")) for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
+    if (wanted(selected, "small")) try small(r, a, paths, smoke);
+    if (wanted(selected, "adversarial")) try adversarial(r, gpa, a, smoke);
+    if (wanted(selected, "long")) {
         try longPrefix(r, gpa, a, smoke);
         try longRepeated(r, gpa, a, smoke);
     }
-    if (wanted(selected.items, "features")) try features(r, gpa, smoke);
+    if (wanted(selected, "features")) try features(r, gpa, smoke);
 }
 
 /// Whether `workload` was asked for; no names means all of them.
@@ -317,7 +323,9 @@ fn features(r: Report, gpa: Allocator, smoke: bool) !void {
 fn walking(r: Report, gpa: Allocator, smoke: bool) !void {
     const io = r.io;
     const root_path = ".zig-cache/sweep-bench-tree";
+    try std.Io.Dir.cwd().deleteTree(io, root_path);
     try std.Io.Dir.cwd().createDirPath(io, root_path);
+    // glint-ignore: Z026 -- the tree is cache scratch and the next run deletes it before filling it, so a leftover is never read
     defer std.Io.Dir.cwd().deleteTree(io, root_path) catch {};
     const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
     defer root.close(io);

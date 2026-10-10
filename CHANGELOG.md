@@ -51,6 +51,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Plain compiled byte patterns reuse validated direct execution; fixed-width star tails and basename prefixes avoid DFA construction.
 - Small compilations use stack construction, and Sets hash component prefixes, including patterns longer than `Pattern.max_units`.
 - One-shot literal rejection skips dialect setup when the first byte decides the result.
+- CI gates glint's A004 (raw aegis scalar operations) and Z026 (a discarded error) through the `glint` object of `ci/preflight.json`, over source, tests, benchmarks, examples and CI programs; the retired exception files are gone.
 
 - `foldCase` exposes the Unicode 18 default simple scalar mapping used by
   `Case.unicode`, so filesystem consumers share one case-folding owner.

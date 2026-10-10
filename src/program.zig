@@ -211,6 +211,17 @@ pub const Frame = struct {
 
 pub const no_jump: Position = .fromRaw(Node.max_arg);
 
+/// The operand that names `position`. Positions are issued below `Node.max_arg`, so only a position
+/// made from outside the builder can fail here.
+pub fn operand(position: Position) Builder.Full!u28 {
+    return aegis.int.cast(u28, position.raw()) catch error.Full;
+}
+
+/// The operand that names the position `by` nodes on from `position`.
+pub fn operandAfter(position: Position, by: u32) Builder.Full!u28 {
+    return operand(position.advance(.fromRaw(by)) catch return error.Full);
+}
+
 /// Room a program is built into: fixed slices, filled from the front.
 // aegis: measured-boundary: docs/design.md#safety-boundaries; slice cursors are validated at emit and remain raw within one construction pass.
 pub const Builder = struct {
@@ -283,12 +294,17 @@ pub const Bounds = struct {
         return .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = .fromRaw(braces) };
     }
 
+    /// Whether a program within these bounds fits the room `limit` gives.
+    pub fn fits(b: Bounds, limit: Bounds) bool {
+        return b.nodes.compare(limit.nodes) != .gt and b.classes.compare(limit.classes) != .gt and b.ranges.compare(limit.ranges) != .gt and b.frames.compare(limit.frames) != .gt;
+    }
+
     /// Adds an entry and its fork before allocating one combined automaton.
     pub fn append(total: *Bounds, entry: Bounds) Error!void {
         const nodes = (total.nodes.add(entry.nodes) catch return error.PatternTooLong).add(.fromRaw(1)) catch return error.PatternTooLong;
         const classes = total.classes.add(entry.classes) catch return error.PatternTooLong;
         const ranges = total.ranges.add(entry.ranges) catch return error.PatternTooLong;
-        total.* = .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = if (total.frames.raw() > entry.frames.raw()) total.frames else entry.frames };
+        total.* = .{ .nodes = nodes, .classes = classes, .ranges = ranges, .frames = if (total.frames.compare(entry.frames) == .gt) total.frames else entry.frames };
     }
 
     /// A tagged program adds two capture instructions per source item.

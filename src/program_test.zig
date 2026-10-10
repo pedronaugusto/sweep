@@ -12,7 +12,7 @@ test "W4 conservative construction bounds preserve representable programs" {
     @memset(pattern, '{');
     const options: Options = .{ .syntax = .editorconfig };
     const bounds = try program.Bounds.of(pattern, options);
-    try std.testing.expect(bounds.nodes.raw() > program.Node.max_arg);
+    try std.testing.expectEqual(std.math.Order.gt, bounds.nodes.compare(.fromRaw(program.Node.max_arg)));
     var builder: Set.Builder = .init(gpa);
     defer builder.deinit();
     try std.testing.expectError(error.InvalidPattern, builder.add("{", .{ .options = .{ .syntax = .glob } }));
