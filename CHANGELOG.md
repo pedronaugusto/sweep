@@ -34,9 +34,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- A `Set` of at most 32 entries per reading that literal strategies and the direct reader decide answers `any`, `first`, `last` and `all` by asking the entries one at a time, stopping where the mode has its answer; the hashed tables and the lazy DFA serve larger sets, `ancestors` and `leadsTo`. A dozen attribute-style entries cost 113 ns a path in `all` where they cost 208.
+- A `Set` of at most 32 entries per reading that literal strategies and the direct reader decide answers `any`, `first`, `last` and `all` by asking the entries one at a time, stopping where the mode has its answer; the hashed tables and the lazy DFA serve larger sets, `ancestors` and `leadsTo`. Twelve attribute-style entries cost 76 ns a path in `all` where they cost 215, and 7 in `any` where they cost 155; thirty ignore-style entries cost 135 where they cost 196.
 - `**/lit/**` and `**/*` (a lone `*` at any depth) are decided by a literal comparison, as `**/lit` and `lit/**` are; the first searches a block of the subject at a time.
-- `Set.Cache.Options.capacity` is the most a reading's cache takes, no longer at least 64 KiB: a reading takes 8 KiB and 2 KiB an entry at most, and one with no automaton takes nothing, in one allocation.
+- `Set.Cache.Options.capacity` is the most a reading's cache takes, no longer at least 64 KiB: a reading takes 8 KiB and 2 KiB an entry at most, and one with no automaton takes nothing, all in one allocation. Making a cache for a small set cost 1.7 to 8 microseconds, mostly a mapping of memory it never used, and costs 30 nanoseconds.
+- Building a `Set` takes a quarter to a third less time from thirty entries up, as the unit classes of a program are split once for each literal it holds, and 0.3 microseconds more (1.06 to 1.37) for three entries, the price of the list a scan keeps.
 - Ordinary epsilon closure skips extglob cycle tracking, and NFA steps fold a unit once across all active threads.
 - DFA construction reuses canonical unit representatives; ordinary parsing skips disabled numeric, extglob and capture work.
 - Direct matching consumes standalone component stars before general execution and scans each remaining component's star segments with one local bound.
