@@ -1,6 +1,9 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
+    // lazyImport compares every package of the dependency tree at comptime;
+    // a large tree runs past the default quota of 1000 branches.
+    @setEvalBranchQuota(100_000);
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const module = sweepModule(b, target, optimize);
@@ -96,6 +99,9 @@ pub fn build(b: *std.Build) !void {
 /// its own mode, so a ReleaseFast benchmark over the Debug module would
 /// time the Debug module.
 fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) []const std.Build.Module.Import {
+    // lazyImport compares every package of the dependency tree at comptime;
+    // a large tree runs past the default quota of 1000 branches.
+    @setEvalBranchQuota(100_000);
     const sweep = sweepModule(b, target, optimize);
     // The root already requests this lazy test dependency. If configure
     // needs another pass, the root returns LazyDependencyNeeded below.
