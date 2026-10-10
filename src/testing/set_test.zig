@@ -4,6 +4,7 @@
 const std = @import("std");
 const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
+const scan = @import("../scan.zig");
 const repeat = @import("shakedown").corpus.repeat;
 
 // The property loops build thousands of patterns; the testing allocator's
@@ -72,34 +73,49 @@ fn queriesOne(s: gen.Source) anyerror!void {
     defer f.deinit();
     var cache: Set.Cache = try .init(gpa, &f.set, .{ .capacity = .fromRaw(if (s.oneIn(2)) 0 else 1 << 17) });
     defer cache.deinit();
-    var out: std.ArrayList(Set.Index) = .empty;
-    defer out.deinit(gpa);
     for (0..4) |_| {
         var text_buf: [16]u8 = undefined;
         const text = gen.string(s, &text_buf, &gen.any_text);
         const kind: sweep.Kind = if (s.value(bool)) .dir else .file;
-        var want_first: ?Set.Index = null;
-        var want_last: ?Set.Index = null;
-        var want_all: std.ArrayList(Set.Index) = .empty;
-        defer want_all.deinit(gpa);
-        for (0..f.patterns.items.len) |i| if (f.matches(i, text, kind)) {
-            if (want_first == null) want_first = .fromRaw(@intCast(i));
-            want_last = .fromRaw(@intCast(i));
-            try want_all.append(gpa, .fromRaw(@intCast(i)));
-        };
-        out.clearRetainingCapacity();
-        try f.set.all(gpa, &cache, text, kind, &out);
-        const ok = f.set.any(&cache, text, kind) == (want_first != null) and
-            f.set.first(&cache, text, kind) == want_first and
-            f.set.last(&cache, text, kind) == want_last and
-            std.mem.eql(Set.Index, out.items, want_all.items);
-        if (!ok) {
-            std.debug.print("set vs \"{f}\" ({t}): want {any}, all {any}, first {?}, last {?}\n", .{ std.zig.fmtString(text), kind, want_all.items, out.items, f.set.first(&cache, text, kind), f.set.last(&cache, text, kind) });
-            std.debug.print("{s}", .{f.texts.items});
-            return error.TestUnexpectedResult;
+        // As built, these entries are scanned.
+        try agrees(&f, &cache, text, kind);
+        // The same set with its scans set aside answers from the hashed
+        // tables and the automaton.
+        var aside: [16]@TypeOf(f.set.parts[0].scan) = undefined;
+        for (f.set.parts, aside[0..f.set.parts.len]) |*part, *kept| {
+            kept.* = part.scan;
+            part.scan = null;
         }
-        try ancestorsAgree(&f, &cache, text, kind);
+        defer for (f.set.parts, aside[0..f.set.parts.len]) |*part, kept| {
+            part.scan = kept;
+        };
+        try agrees(&f, &cache, text, kind);
     }
+}
+
+fn agrees(f: *Fixture, cache: *Set.Cache, text: []const u8, kind: sweep.Kind) !void {
+    var out: std.ArrayList(Set.Index) = .empty;
+    defer out.deinit(gpa);
+    var want_first: ?Set.Index = null;
+    var want_last: ?Set.Index = null;
+    var want_all: std.ArrayList(Set.Index) = .empty;
+    defer want_all.deinit(gpa);
+    for (0..f.patterns.items.len) |i| if (f.matches(i, text, kind)) {
+        if (want_first == null) want_first = .fromRaw(@intCast(i));
+        want_last = .fromRaw(@intCast(i));
+        try want_all.append(gpa, .fromRaw(@intCast(i)));
+    };
+    try f.set.all(gpa, cache, text, kind, &out);
+    const ok = f.set.any(cache, text, kind) == (want_first != null) and
+        f.set.first(cache, text, kind) == want_first and
+        f.set.last(cache, text, kind) == want_last and
+        std.mem.eql(Set.Index, out.items, want_all.items);
+    if (!ok) {
+        std.debug.print("set vs \"{f}\" ({t}): want {any}, all {any}, first {?}, last {?}\n", .{ std.zig.fmtString(text), kind, want_all.items, out.items, f.set.first(cache, text, kind), f.set.last(cache, text, kind) });
+        std.debug.print("{s}", .{f.texts.items});
+        return error.TestUnexpectedResult;
+    }
+    try ancestorsAgree(f, cache, text, kind);
 }
 
 fn ancestorsAgree(f: *const Fixture, cache: *Set.Cache, text: []const u8, kind: sweep.Kind) !void {
@@ -291,4 +307,67 @@ test "eight threads share one set, each with its own cache" {
     for (&threads) |*t| t.* = try std.Thread.spawn(.{}, Worker.run, .{ &set, &failed });
     for (threads) |t| t.join();
     try std.testing.expect(!failed.load(.monotonic));
+}
+
+fn setOf(lines: []const []const u8, options: sweep.Options) !Set {
+    var builder: Set.Builder = .init(gpa);
+    defer builder.deinit();
+    for (lines) |line| _ = try builder.add(line, .{ .options = options });
+    return builder.build();
+}
+
+test "a few entries are scanned and many are not" {
+    var names: [scan.max_entries + 1][8]u8 = undefined;
+    var lines: [names.len][]const u8 = undefined;
+    for (&names, &lines, 0..) |*name, *line, i| line.* = std.mem.print(name, "*.e{d}", .{i}) catch unreachable;
+    var at_limit = try setOf(lines[0..scan.max_entries], .{ .anywhere = true });
+    defer at_limit.deinit();
+    try std.testing.expect(at_limit.parts[0].scan != null);
+    var past_limit = try setOf(&lines, .{ .anywhere = true });
+    defer past_limit.deinit();
+    try std.testing.expect(past_limit.parts[0].scan == null);
+}
+
+test "an entry only the automaton reads keeps its reading out of the scan" {
+    var plain = try setOf(&.{ "*.c", "src/**", "[Mm]akefile" }, .{ .anywhere = true });
+    defer plain.deinit();
+    try std.testing.expect(plain.parts[0].scan != null);
+    var braces = try setOf(&.{ "*.c", "{a,b}.h" }, .{ .syntax = .glob, .anywhere = true });
+    defer braces.deinit();
+    try std.testing.expect(braces.parts[0].scan == null);
+    var cache: Set.Cache = try .init(gpa, &braces, .{});
+    defer cache.deinit();
+    try std.testing.expectEqual(@as(?Set.Index, .fromRaw(1)), braces.last(&cache, "x/a.h", .file));
+}
+
+test "a set takes a cache the size of its entries" {
+    // Literal strategies only: no automaton, so no cache to hold.
+    var literal = try setOf(&.{ "*.c", "src/**", "node_modules" }, .{ .anywhere = true });
+    defer literal.deinit();
+    var empty: Set.Cache = try .init(gpa, &literal, .{});
+    defer empty.deinit();
+    try std.testing.expectEqual(@as(usize, 0), empty.parts[0].lazy.memory.len);
+    try std.testing.expectEqual(@as(?Set.Index, .fromRaw(2)), literal.last(&empty, "a/node_modules", .file));
+    var it = literal.ancestors(&empty, "src/a/b.c", .file);
+    try std.testing.expect(it.next().?.leads);
+    // A dozen entries with an automaton: far less than the default capacity.
+    var dozen = try setOf(&.{ "*", "*.c", "*.h", "*.min.js", "[Mm]akefile", "**/test/**", "docs/**", "vendor/**", "a?c/*.o", "*.[ch]pp", "lib/**/x*", "tmp*/" }, .{ .anywhere = true });
+    defer dozen.deinit();
+    var small: Set.Cache = try .init(gpa, &dozen, .{});
+    defer small.deinit();
+    try std.testing.expect(small.parts[0].lazy.memory.len > 0);
+    try std.testing.expect(small.parts[0].lazy.memory.len <= 32 * 1024);
+    // The capacity a caller names is a limit, not a floor.
+    var named: Set.Cache = try .init(gpa, &dozen, .{ .capacity = .fromRaw(1 << 12) });
+    defer named.deinit();
+    try std.testing.expect(named.parts[0].lazy.memory.len <= 8 * 1024);
+    // Many entries still get what they are allowed.
+    var lines: [1000][12]u8 = undefined;
+    var texts: [lines.len][]const u8 = undefined;
+    for (&lines, &texts, 0..) |*buffer, *text, i| text.* = std.mem.print(buffer, "d{d}/**/x*?", .{i}) catch unreachable;
+    var large = try setOf(&texts, .{});
+    defer large.deinit();
+    var big: Set.Cache = try .init(gpa, &large, .{});
+    defer big.deinit();
+    try std.testing.expect(big.parts[0].lazy.memory.len > 1 << 20);
 }

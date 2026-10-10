@@ -126,3 +126,8 @@ pub const ignore_lines = [_]Line{
     .{ .pattern = "*.gcno" },                    .{ .pattern = "vendor/*.tmp" },                 .{ .pattern = "out", .dir_only = true },
     .{ .pattern = "*.orig" },                    .{ .pattern = "*.rej" },                        .{ .pattern = "*.tmp" },
 };
+
+/// One entry of each kind a small set holds, anywhere: an exact path, an
+/// extension, a directory tree, a base name, a bracket, a component in the
+/// middle and everything.
+pub const shapes = [_][]const u8{ "src/main.c", "*.c", "docs/**", "node_modules", "tmp*", "[Mm]akefile", "**/test/**", "*" };

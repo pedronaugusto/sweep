@@ -359,6 +359,7 @@ fn small(r: Report, a: Allocator, paths: []const []const u8, smoke: bool) !void 
         for (entries, lines) |e, *line| line.* = .{ .pattern = e.pattern, .dir_only = e.dir_only };
         try sources.append(a, .{ .name = try a.print("generated {d}", .{n}), .lines = lines });
     }
+    for (gen.shapes) |shape| try sources.append(a, .{ .name = try a.print("one {s}", .{shape}), .lines = &.{.{ .pattern = shape }} });
     // The allocator a caller that loads many files meets: its large blocks
     // are mapped and unmapped, so the size of a cache shows.
     const gpa = std.heap.smp_allocator;

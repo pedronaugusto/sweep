@@ -30,6 +30,7 @@ pub const layers: []const gantry.rules.Layer = &.{
         "src/capture.zig",
         "src/dfa.zig",
         "src/tables.zig",
+        "src/scan.zig",
     } },
     .{ .name = "compiled patterns and lazy DFAs", .patterns = &.{
         "src/pattern.zig",

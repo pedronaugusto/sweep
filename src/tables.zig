@@ -175,7 +175,8 @@ pub const Strategies = struct {
         defer suffix.deinit(gpa);
         for (entries, 0..) |e, i| {
             if (!e.reading.eql(reading)) continue;
-            const strategy = e.strategy orelse continue;
+            if (!e.hashed) continue;
+            const strategy = e.strategy.?;
             const pair: Table.Pair = .{ .key = strategy.literal, .index = @intCast(i) };
             switch (strategy.kind) {
                 .exact => try exact.append(gpa, pair),

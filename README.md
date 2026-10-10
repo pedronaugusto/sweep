@@ -137,7 +137,9 @@ needs, then use a validated direct reader for plain byte patterns or a small DFA
 built at compile time (64 states at most); the
 NFA is the fallback that keeps the bound. A set hashes the literal entries (whole
 paths, base names, extensions, directory prefixes, path suffixes and component prefixes) and runs the
-rest as one lazy DFA whose states a per-thread cache builds on first use.
+rest as one lazy DFA whose states a per-thread cache builds on first use. A set of at most 32
+entries that literal comparisons and the direct reader decide asks them one at a time instead, which
+costs a few nanoseconds an entry and does not touch the cache.
 
 `match` reads a plain pattern straight from its text, only as far as the answer
 needs: bytes, `?`, `*`, `**`, and brackets of bytes and ranges with case kept, with

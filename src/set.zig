@@ -1,6 +1,7 @@
-//! Many patterns matched in one pass: hashed literal strategies for the
-//! patterns they decide, and one automaton per reading for the rest, run
-//! as a lazy DFA whose states a per-thread cache keeps.
+//! Many patterns matched together: a few entries asked one at a time, or
+//! hashed literal strategies for the patterns they decide and one automaton
+//! per reading for the rest, run as a lazy DFA whose states a per-thread
+//! cache keeps.
 const std = @import("std");
 const aegis = @import("aegis");
 const syntax = @import("syntax.zig");
@@ -10,6 +11,7 @@ const strategy_mod = @import("strategy.zig");
 const tables = @import("tables.zig");
 const lazy = @import("lazy.zig");
 const direct = @import("direct.zig");
+const scan_mod = @import("scan.zig");
 
 const Allocator = std.mem.Allocator;
 const file = @This();
@@ -54,8 +56,10 @@ pub const Builder = struct {
         pattern: []u8,
         entry: Entry,
         reading: program_mod.Reading,
-        /// The literal strategy that decides it, or null for the automaton.
+        /// The literal strategy that decides it, if one does.
         strategy: ?strategy_mod.Strategy,
+        /// Whether the strategy is in the hashed tables rather than the automaton.
+        hashed: bool = false,
     };
 
     /// An empty builder whose entries and set come from `gpa`.
@@ -109,7 +113,8 @@ pub const Builder = struct {
             defer lit.deinit(gpa);
             try strategy_mod.bytes(gpa, program, shape.first, shape.end, &lit);
             const strategy: strategy_mod.Strategy = .{ .kind = kind, .literal = lit.items };
-            if (tables.hashable(strategy, reading)) stored.strategy = .{ .kind = kind, .literal = try lit.toOwnedSlice(gpa) };
+            stored.hashed = tables.hashable(strategy, reading);
+            stored.strategy = .{ .kind = kind, .literal = try lit.toOwnedSlice(gpa) };
         }
         errdefer if (stored.strategy) |s| gpa.free(s.literal);
         try b.entries.append(gpa, stored);
@@ -212,7 +217,9 @@ pub const Set = struct {
         parts: []PartCache,
 
         pub const Options = struct {
-            /// Bytes for each reading's states, at least 64 KiB.
+            /// Most bytes for each reading's states. A reading takes only
+            /// what its entries can use, about 8 KiB and 2 KiB an entry, so
+            /// a small set costs a small cache whatever is named here.
             capacity: StorageBytes = .fromRaw(1 << 21),
         };
 
@@ -229,7 +236,7 @@ pub const Set = struct {
                 gpa.free(parts);
             }
             for (s.parts, parts) |*part, *c| {
-                c.* = .{ .lazy = try .init(gpa, &part.automaton, @max(options.capacity.raw(), 1 << 16)) };
+                c.* = .{ .lazy = try .init(gpa, &part.automaton, options.capacity.raw()) };
                 done += 1;
             }
             return .{ .gpa = gpa, .parts = parts };
@@ -395,6 +402,11 @@ pub const Set = struct {
 
     fn run(s: *const Set, c: *Cache, subject: []const u8, acc: *Accumulator) void {
         for (s.parts, c.parts) |*part, *cache| {
+            if (part.scan) |*scan| {
+                scan.visit(subject, acc);
+                if (acc.mode == .any and acc.found) return;
+                continue;
+            }
             part.strategies.visit(subject, part.reading, acc);
             if (acc.mode == .any and acc.found) return;
             if (part.single) |single| {
@@ -458,6 +470,8 @@ const Part = struct {
     automaton: lazy.Automaton,
     // aegis: design: docs/design.md#safety-boundaries; this private entry index is installed only from the validated insertion-order enumeration.
     single: ?struct { source: []u8, compiled: direct.Compiled, index: u32 } = null,
+    /// The entries asked one at a time, when there are few enough, in place of the tables and the DFA for `run`.
+    scan: ?scan_mod.Scan = null,
 
     fn build(gpa: Allocator, entries: []const Builder.Stored, reading: program_mod.Reading) BuildError!Part {
         var strategies: tables.Strategies = try .build(gpa, entries, reading);
@@ -465,8 +479,11 @@ const Part = struct {
         var automaton: lazy.Automaton = try .build(gpa, entries, reading);
         errdefer automaton.deinit(gpa);
         var part: Part = .{ .reading = reading, .strategies = strategies, .automaton = automaton };
+        // A scan answers `run` alone, so the single entry fast path is not needed.
+        part.scan = try scan_mod.Scan.build(gpa, entries, reading);
+        if (part.scan != null) return part;
         var only: ?usize = null;
-        for (entries, 0..) |entry, index| if (entry.reading.eql(reading) and entry.strategy == null) {
+        for (entries, 0..) |entry, index| if (entry.reading.eql(reading) and !entry.hashed) {
             if (only != null) return part;
             only = index;
         };
@@ -485,6 +502,7 @@ const Part = struct {
         p.strategies.deinit(gpa);
         p.automaton.deinit(gpa);
         if (p.single) |single| gpa.free(single.source);
+        if (p.scan) |*scan| scan.deinit(gpa);
         p.* = undefined;
     }
 };

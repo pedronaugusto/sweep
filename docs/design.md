@@ -30,7 +30,7 @@ instances are shared, so importing the root and concerns preserves type identity
 | Classes | `class.zig` owns bracket membership and folded ranges. |
 | Automaton | `program.zig` owns Thompson instructions, construction scratch, contexts and the shared subject reader. |
 | Parser, execution and literals | `parse.zig` owns grammar and emits instructions; `integer.zig` compiles decimal intervals; `nfa.zig` simulates the program; `direct.zig` reads eligible byte patterns; `strategy.zig` recognizes literal strategies; `helpers.zig` owns syntax helpers. |
-| One-shot, DFA states and hashed literals | `match.zig` owns one-shot stack scratch; `capture.zig` owns tagged execution; `dfa.zig` builds unit partitions and states; `tables.zig` owns literal indexes. |
+| One-shot, DFA states, hashed and scanned literals | `match.zig` owns one-shot stack scratch; `capture.zig` owns tagged execution; `dfa.zig` builds unit partitions and states; `tables.zig` owns literal indexes; `scan.zig` owns the entry list a small reading is asked one by one. |
 | Compiled patterns and lazy DFAs | `pattern.zig` owns a compiled Pattern; `lazy.zig` owns set automata and their mutable DFA caches. |
 | Sets | `set.zig` owns entry order, immutable partitions and query aggregation. |
 | Line grammar | `gitignore.zig` parses a borrowed line; files, levels and precedence stay outside sweep. |
@@ -88,7 +88,21 @@ exact paths, basenames, extensions, prefixes and suffixes, and run the rest as
 one lazy DFA per reading. A single eligible remaining entry can run directly;
 its program remains available for ancestor and pruning queries.
 
-A Set cache allocates at initialization. Exhaustion clears DFA states; more than
+A reading of at most 32 entries, each decided by a literal strategy or the
+direct reader, is scanned instead: `any`, `first`, `last` and `all` ask its
+entries one at a time in insertion order and stop where the mode has its
+answer (`last` asks from the end). That costs the entries, a few nanoseconds
+each, where the hashes and the DFA cost a step per subject byte, about the
+price of asking thirty entries; past that the tables win. The tables and the
+automaton remain for `ancestors` and `leadsTo`, which follow a prefix at a
+time. Both executors answer from the same compiled entries, and the tests
+compare them with each other and with one compiled pattern per entry.
+
+A Set cache allocates once, at initialization, one block per reading that has
+an automaton and nothing for one that has none. A reading takes only what its
+entries can use, 8 KiB and 2 KiB an entry (about four times the states the
+measured sets reach), at most the capacity named, so a small set costs a small
+cache whatever the caller allows. Exhaustion clears DFA states; more than
 three clears in a query with excessive state construction switches that query
 to NFA simulation. Capacity changes speed, never answers or the bound. Statistics
 record states, clears and fallbacks. The engine allocates nothing after scratch

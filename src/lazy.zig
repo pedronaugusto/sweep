@@ -23,6 +23,8 @@ pub const Automaton = struct {
     cyclic: bool = false,
     live: []u2 = &.{},
     units: ?dfa.Classes = null,
+    /// How many entries the program holds.
+    entries: u32 = 0,
 
     pub fn build(gpa: Allocator, entries: anytype, reading: program_mod.Reading) BuildError!Automaton {
         var a: Automaton = .{ .reading = reading };
@@ -30,12 +32,14 @@ pub const Automaton = struct {
         var total: program_mod.Bounds = .{};
         var count: usize = 0;
         for (entries) |e| {
-            if (!e.reading.eql(reading) or e.strategy != null) continue;
+            if (!e.reading.eql(reading) or e.hashed) continue;
             const bounds: program_mod.Bounds = try program_mod.Bounds.of(e.pattern, e.entry.options);
             try total.append(bounds);
             count += 1;
         }
         if (count == 0) return a;
+        // safe: the set holds at most max_entries entries, below u32.
+        a.entries = @intCast(count);
         var b: program_mod.Builder = .{
             .nodes = try gpa.alloc(program_mod.Node, total.nodes.raw()),
             .classes = &.{},
@@ -51,7 +55,7 @@ pub const Automaton = struct {
         defer gpa.free(b.frames);
         var seen: usize = 0;
         for (entries, 0..) |e, index| {
-            if (!e.reading.eql(reading) or e.strategy != null) continue;
+            if (!e.reading.eql(reading) or e.hashed) continue;
             seen += 1;
             // A fork to this entry and to the next one.
             const fork = if (seen < count) b.emit(.split, 0) catch unreachable else null; // unreachable: sized above
@@ -137,6 +141,8 @@ const State = struct {
 // aegis: measured-boundary: docs/design.md#safety-boundaries; cache state/arena indices remain private and valid only until the next clear; typed byte capacity enters at Set.Cache.init.
 pub const Cache = struct {
     automaton: *const Automaton,
+    /// Everything below, in one allocation.
+    memory: []align(@alignOf(State)) u8,
     /// Kernels, transition rows and accept lists.
     arena: []u32,
     used: usize = 0,
@@ -153,39 +159,65 @@ pub const Cache = struct {
     generation: u32 = 0,
     stats: Stats = .{},
 
+    /// A cache for `a` of at most `capacity` bytes, in one allocation. An
+    /// automaton with no entries needs none, and one with few takes no more
+    /// than its states can use: `capacity` is what a set may be given, never
+    /// what a small one is charged.
     pub fn init(gpa: Allocator, a: *const Automaton, capacity: usize) Allocator.Error!Cache {
-        const nodes = a.nodes.len;
-        const class_count = if (a.units) |u| u.count() else 0;
-        const max_states = @max(16, capacity / 256);
-        const slot_count = std.math.ceilPowerOfTwoAssert(usize, 2 * max_states);
-        const fixed = max_states * @sizeOf(State) + slot_count * 4;
-        // Room for a few of the largest possible states, whatever the
-        // capacity says.
-        const arena_words = @max((capacity -| fixed) / 4, 4 * (2 * nodes + class_count) + 64);
         var c: Cache = .{
             .automaton = a,
-            .arena = try gpa.alloc(u32, arena_words),
+            .memory = &.{},
+            .arena = &.{},
             .states = &.{},
             .slots = &.{},
             .scratch = &.{},
             .buf = &.{},
         };
-        errdefer c.deinit(gpa);
-        c.states = try gpa.alloc(State, max_states);
-        c.slots = try gpa.alloc(u32, slot_count);
-        c.scratch = try gpa.alloc(u64, 7 * nfa.words(nodes));
-        c.buf = try gpa.alloc(u32, nodes);
+        if (a.isEmpty()) return c;
+        const nodes = a.nodes.len;
+        const class_count = if (a.units) |u| u.count() else 0;
+        const budget = @min(capacity, useful(a));
+        const max_states = @max(16, budget / 256);
+        const slot_count = std.math.ceilPowerOfTwoAssert(usize, 2 * max_states);
+        const scratch_words = 7 * nfa.words(nodes);
+        const fixed = max_states * @sizeOf(State) + slot_count * 4;
+        // Room for a few of the largest possible states, whatever the
+        // capacity says.
+        const arena_words = @max((budget -| fixed) / 4, 4 * (2 * nodes + class_count) + 64);
+        // The widest parts first, each a multiple of the next one's alignment.
+        const words = arena_words + slot_count + nodes;
+        const total = std.math.add(usize, scratch_words * @sizeOf(u64) + max_states * @sizeOf(State), words * 4) catch return error.OutOfMemory;
+        c.memory = try gpa.alignedAlloc(u8, .of(State), total);
+        var at: usize = 0;
+        c.scratch = carve(u64, c.memory, &at, scratch_words);
+        c.states = carve(State, c.memory, &at, max_states);
+        c.arena = carve(u32, c.memory, &at, arena_words);
+        c.slots = carve(u32, c.memory, &at, slot_count);
+        c.buf = carve(u32, c.memory, &at, nodes);
         c.clear();
         c.stats.clears = 0;
         return c;
     }
 
+    /// The next `len` elements of `memory`, from `at`, which advances. The
+    /// parts are cut widest first from an allocation aligned for the widest,
+    /// and each size is a multiple of the next part's alignment.
+    fn carve(comptime T: type, memory: []align(@alignOf(State)) u8, at: *usize, len: usize) []T {
+        const bytes = memory[at.*..][0 .. len * @sizeOf(T)];
+        at.* += bytes.len;
+        return @as([*]T, @ptrCast(@alignCast(bytes.ptr)))[0..len]; // safe: aligned as above, and the slice is len elements of T
+    }
+
+    /// Bytes that `a`'s states can use: the states a set reaches grow with
+    /// its entries, about one to three for each, and each takes about
+    /// 200 bytes. Four times that, so a subject mix wider than the measured
+    /// ones still fits and does not clear.
+    fn useful(a: *const Automaton) usize {
+        return 8 * 1024 +| 2 * 1024 *| @as(usize, a.entries);
+    }
+
     pub fn deinit(c: *Cache, gpa: Allocator) void {
-        gpa.free(c.arena);
-        gpa.free(c.states);
-        gpa.free(c.slots);
-        gpa.free(c.scratch);
-        gpa.free(c.buf);
+        gpa.free(c.memory);
         c.* = undefined;
     }
 
