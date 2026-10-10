@@ -92,3 +92,37 @@ pub const singles = [_]struct { []const u8, bool }{
     .{ "*/*/*/*.json", false },
     .{ "[a-m]*/**/*.go", false },
 };
+
+/// A line of a small ignore- or attributes-style file.
+pub const Line = struct { pattern: []const u8, dir_only: bool = false, anchored: bool = false };
+
+/// Lines of the shape an attributes file holds: wildcards, extensions,
+/// directory trees and bracket names.
+pub const attribute_lines = [_]Line{
+    .{ .pattern = "*" },
+    .{ .pattern = "*.c" },
+    .{ .pattern = "*.h" },
+    .{ .pattern = "*.zig" },
+    .{ .pattern = "*.json" },
+    .{ .pattern = "*.o" },
+    .{ .pattern = "*.S" },
+    .{ .pattern = "docs/**" },
+    .{ .pattern = "vendor/**" },
+    .{ .pattern = "*.min.js" },
+    .{ .pattern = "[Mm]akefile" },
+    .{ .pattern = "**/test/**" },
+};
+
+/// Lines of the shape an ignore file holds.
+pub const ignore_lines = [_]Line{
+    .{ .pattern = "*.o" },                       .{ .pattern = "*.a" },                          .{ .pattern = "*.so" },
+    .{ .pattern = "*.pyc" },                     .{ .pattern = "*.log" },                        .{ .pattern = "build", .dir_only = true },
+    .{ .pattern = "zig-out", .anchored = true }, .{ .pattern = ".zig-cache", .dir_only = true }, .{ .pattern = "node_modules", .dir_only = true },
+    .{ .pattern = "*.swp" },                     .{ .pattern = "*~" },                           .{ .pattern = ".DS_Store" },
+    .{ .pattern = "tmp*", .dir_only = true },    .{ .pattern = "[Bb]in", .dir_only = true },     .{ .pattern = "**/generated/**" },
+    .{ .pattern = "*.min.js" },                  .{ .pattern = "cache-*" },                      .{ .pattern = "*.bak" },
+    .{ .pattern = "docs/**/*.html" },            .{ .pattern = "*.sw[op]" },                     .{ .pattern = "*.class" },
+    .{ .pattern = "Thumbs.db" },                 .{ .pattern = "coverage", .anchored = true },   .{ .pattern = "*.gcda" },
+    .{ .pattern = "*.gcno" },                    .{ .pattern = "vendor/*.tmp" },                 .{ .pattern = "out", .dir_only = true },
+    .{ .pattern = "*.orig" },                    .{ .pattern = "*.rej" },                        .{ .pattern = "*.tmp" },
+};

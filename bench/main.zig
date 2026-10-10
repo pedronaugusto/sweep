@@ -1,9 +1,11 @@
-//! sweep's own workloads, timed: `zig build bench [-- --smoke] [-- --json]`.
+//! sweep's own workloads, timed: `zig build bench [-- --smoke] [-- --json] [-- <workload>...]`.
 //!
 //! - single: realistic patterns over a synthetic tree, one-shot and compiled;
 //! - compile: per-pattern compile and set builds;
 //! - set: `any`, `last`, `all` and an `ancestors` pass over sets of 100 to
 //!   10,000 gitignore-shaped entries, with the lazy DFA's states and clears;
+//! - small: sets of 1 to 64 entries, the size of one ignore or attributes file,
+//!   loaded (build and cache) and queried warm;
 //! - adversarial: the shapes that make backtrackers exponential.
 //!
 //! Timings are wall-clock on this machine; CI only compiles this file.
@@ -43,8 +45,9 @@ pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(a);
     var smoke = false;
     var json = false;
+    var selected: std.ArrayList([]const u8) = .empty;
     for (args[1..]) |arg| {
-        if (std.mem.eql(u8, arg, "--smoke")) smoke = true else if (std.mem.eql(u8, arg, "--json")) json = true else return error.UnknownArgument;
+        if (std.mem.eql(u8, arg, "--smoke")) smoke = true else if (std.mem.eql(u8, arg, "--json")) json = true else if (!std.mem.startsWith(u8, arg, "--")) try selected.append(a, arg) else return error.UnknownArgument;
     }
     var buffer: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &buffer);
@@ -52,13 +55,23 @@ pub fn main(init: std.process.Init) !void {
     defer r.w.flush() catch {};
 
     const paths = try gen.tree(a, if (smoke) 2_000 else 100_000, 0x5eeb);
-    try single(r, gpa, paths, smoke);
-    try compile(r, gpa, if (smoke) 1 else 2_000);
-    for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
-    try adversarial(r, gpa, a, smoke);
-    try longPrefix(r, gpa, a, smoke);
-    try longRepeated(r, gpa, a, smoke);
-    try features(r, gpa, smoke);
+    if (wanted(selected.items, "single")) try single(r, gpa, paths, smoke);
+    if (wanted(selected.items, "compile")) try compile(r, gpa, if (smoke) 1 else 2_000);
+    if (wanted(selected.items, "set")) for (if (smoke) &[_]usize{100} else &[_]usize{ 100, 1_000, 10_000 }) |n| try sets(r, gpa, a, paths, n);
+    if (wanted(selected.items, "small")) try small(r, a, paths, smoke);
+    if (wanted(selected.items, "adversarial")) try adversarial(r, gpa, a, smoke);
+    if (wanted(selected.items, "long")) {
+        try longPrefix(r, gpa, a, smoke);
+        try longRepeated(r, gpa, a, smoke);
+    }
+    if (wanted(selected.items, "features")) try features(r, gpa, smoke);
+}
+
+/// Whether `workload` was asked for; no names means all of them.
+fn wanted(selected: []const []const u8, workload: []const u8) bool {
+    if (selected.len == 0) return true;
+    for (selected) |name| if (std.mem.eql(u8, name, workload)) return true;
+    return false;
 }
 
 fn single(r: Report, gpa: Allocator, paths: []const []const u8, smoke: bool) !void {
@@ -328,4 +341,99 @@ fn walking(r: Report, gpa: Allocator, smoke: bool) !void {
         if (paths.items().len != count / 2) return error.MissingPaths;
     }
     try r.line("features", "walk 1000 files (half pruned)", "expand", best / 1e6, "ms");
+}
+
+/// Sets of a handful to a few dozen entries, the size of one ignore or
+/// attributes file: what loading one costs, and what a query costs warm.
+fn small(r: Report, a: Allocator, paths: []const []const u8, smoke: bool) !void {
+    const passes: usize = if (smoke) 1 else 9;
+    const rounds: usize = if (smoke) 1 else 200;
+    const queried = paths[0..@min(paths.len, @as(usize, if (smoke) 100 else 20_000))];
+    const Source = struct { name: []const u8, lines: []const gen.Line };
+    var sources: std.ArrayList(Source) = .empty;
+    for ([_]usize{ 1, 3, 6, 12 }) |n| try sources.append(a, .{ .name = try a.print("attributes {d}", .{n}), .lines = gen.attribute_lines[0..n] });
+    for ([_]usize{ 6, 12, 30 }) |n| try sources.append(a, .{ .name = try a.print("ignore {d}", .{n}), .lines = gen.ignore_lines[0..n] });
+    for ([_]usize{ 16, 32, 64 }) |n| {
+        const entries = try gen.set(a, n, 0x5e7 + n);
+        const lines = try a.alloc(gen.Line, n);
+        for (entries, lines) |e, *line| line.* = .{ .pattern = e.pattern, .dir_only = e.dir_only };
+        try sources.append(a, .{ .name = try a.print("generated {d}", .{n}), .lines = lines });
+    }
+    // The allocator a caller that loads many files meets: its large blocks
+    // are mapped and unmapped, so the size of a cache shows.
+    const gpa = std.heap.smp_allocator;
+    for (sources.items) |source| {
+        var build_ns: f64 = std.math.inf(f64);
+        for (0..passes) |_| {
+            const t = r.now();
+            for (0..rounds) |_| {
+                var set = try buildSmall(gpa, source.lines);
+                set.deinit();
+            }
+            build_ns = @min(build_ns, nsBetween(t, r.now()) / @as(f64, @floatFromInt(rounds)));
+        }
+        try r.line("small", source.name, "build", build_ns / 1e3, "us");
+        var set = try buildSmall(gpa, source.lines);
+        defer set.deinit();
+        for ([_]struct { []const u8, sweep.Set.Cache.Options }{
+            .{ "cache", .{ .capacity = .fromRaw(1 << 16) } },
+            .{ "cache default", .{} },
+        }) |option| {
+            var cache_ns: f64 = std.math.inf(f64);
+            for (0..passes) |_| {
+                const t = r.now();
+                for (0..rounds) |_| {
+                    var cache: sweep.Set.Cache = try .init(gpa, &set, option[1]);
+                    std.mem.doNotOptimizeAway(&cache);
+                    cache.deinit();
+                }
+                cache_ns = @min(cache_ns, nsBetween(t, r.now()) / @as(f64, @floatFromInt(rounds)));
+            }
+            try r.line("small", source.name, option[0], cache_ns / 1e3, "us");
+        }
+        var cache: sweep.Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(1 << 16) });
+        defer cache.deinit();
+        var out: std.ArrayList(sweep.Set.Index) = .empty;
+        defer out.deinit(gpa);
+        var hits: usize = 0;
+        var any_ns: f64 = std.math.inf(f64);
+        var last_ns: f64 = std.math.inf(f64);
+        var all_ns: f64 = std.math.inf(f64);
+        var ancestors_ns: f64 = std.math.inf(f64);
+        const count: f64 = @floatFromInt(queried.len);
+        for (0..passes) |_| {
+            var t = r.now();
+            for (queried) |p| hits += @intFromBool(set.any(&cache, p, .file));
+            any_ns = @min(any_ns, nsBetween(t, r.now()) / count);
+            t = r.now();
+            for (queried) |p| hits += @intFromBool(set.last(&cache, p, .file) != null);
+            last_ns = @min(last_ns, nsBetween(t, r.now()) / count);
+            t = r.now();
+            for (queried) |p| {
+                out.clearRetainingCapacity();
+                try set.all(gpa, &cache, p, .file, &out);
+                hits += out.items.len;
+            }
+            all_ns = @min(all_ns, nsBetween(t, r.now()) / count);
+            t = r.now();
+            for (queried) |p| {
+                var it = set.ancestors(&cache, p, .file);
+                while (it.next()) |step| hits += @intFromBool(step.last != null);
+            }
+            ancestors_ns = @min(ancestors_ns, nsBetween(t, r.now()) / count);
+        }
+        std.mem.doNotOptimizeAway(hits);
+        try r.line("small", source.name, "any", any_ns, "ns/path");
+        try r.line("small", source.name, "last", last_ns, "ns/path");
+        try r.line("small", source.name, "all", all_ns, "ns/path");
+        try r.line("small", source.name, "ancestors", ancestors_ns, "ns/path");
+        try r.line("small", source.name, "states", @floatFromInt(cache.stats().states), "states");
+    }
+}
+
+fn buildSmall(gpa: Allocator, lines: []const gen.Line) !sweep.Set {
+    var builder: sweep.Set.Builder = .init(gpa);
+    defer builder.deinit();
+    for (lines) |line| _ = try builder.add(line.pattern, .{ .options = .{ .anywhere = !line.anchored }, .dir_only = line.dir_only });
+    return builder.build();
 }
