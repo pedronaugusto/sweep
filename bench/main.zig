@@ -429,6 +429,7 @@ fn small(r: Report, a: Allocator, paths: []const []const u8, smoke: bool) !void 
         try r.line("small", source.name, "all", all_ns, "ns/path");
         try r.line("small", source.name, "ancestors", ancestors_ns, "ns/path");
         try r.line("small", source.name, "states", @floatFromInt(cache.stats().states), "states");
+        try r.line("small", source.name, "clears", @floatFromInt(cache.stats().clears), "clears");
     }
 }
 

@@ -122,6 +122,9 @@ pub const Stats = struct {
     fallbacks: u64 = 0,
 };
 
+/// The size of a cache line, at least: where each array of a cache starts.
+const line = 64;
+
 const unknown = std.math.maxInt(u32);
 const dead: u32 = 0;
 
@@ -142,7 +145,7 @@ const State = struct {
 pub const Cache = struct {
     automaton: *const Automaton,
     /// Everything below, in one allocation.
-    memory: []align(@alignOf(State)) u8,
+    memory: []align(line) u8,
     /// Kernels, transition rows and accept lists.
     arena: []u32,
     used: usize = 0,
@@ -184,10 +187,8 @@ pub const Cache = struct {
         // Room for a few of the largest possible states, whatever the
         // capacity says.
         const arena_words = @max((budget -| fixed) / 4, 4 * (2 * nodes + class_count) + 64);
-        // The widest parts first, each a multiple of the next one's alignment.
-        const words = arena_words + slot_count + nodes;
-        const total = std.math.add(usize, scratch_words * @sizeOf(u64) + max_states * @sizeOf(State), words * 4) catch return error.OutOfMemory;
-        c.memory = try gpa.alignedAlloc(u8, .of(State), total);
+        const total = std.math.add(usize, line * 5, scratch_words * @sizeOf(u64) + max_states * @sizeOf(State) + (arena_words + slot_count + nodes) * 4) catch return error.OutOfMemory;
+        c.memory = try gpa.alignedAlloc(u8, .fromByteUnits(line), total);
         var at: usize = 0;
         c.scratch = carve(u64, c.memory, &at, scratch_words);
         c.states = carve(State, c.memory, &at, max_states);
@@ -199,13 +200,12 @@ pub const Cache = struct {
         return c;
     }
 
-    /// The next `len` elements of `memory`, from `at`, which advances. The
-    /// parts are cut widest first from an allocation aligned for the widest,
-    /// and each size is a multiple of the next part's alignment.
-    fn carve(comptime T: type, memory: []align(@alignOf(State)) u8, at: *usize, len: usize) []T {
+    /// The next `len` elements of `memory`, from `at`, which advances to
+    /// the line after them: each array starts on a cache line of its own.
+    fn carve(comptime T: type, memory: []align(line) u8, at: *usize, len: usize) []T {
         const bytes = memory[at.*..][0 .. len * @sizeOf(T)];
-        at.* += bytes.len;
-        return @as([*]T, @ptrCast(@alignCast(bytes.ptr)))[0..len]; // safe: aligned as above, and the slice is len elements of T
+        at.* = std.mem.alignForward(usize, at.* + bytes.len, line);
+        return @as([*]T, @ptrCast(@alignCast(bytes.ptr)))[0..len]; // safe: every part starts on a line, which any element aligns to
     }
 
     /// Bytes that `a`'s states can use: the states a set reaches grow with
