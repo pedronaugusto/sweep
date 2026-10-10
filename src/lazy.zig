@@ -2,6 +2,7 @@
 //! built on first use into a fixed per-thread cache, cleared when full,
 //! and the NFA taking over a query that keeps clearing.
 const std = @import("std");
+const aegis = @import("aegis");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");
 const parse = @import("parse.zig");
@@ -187,7 +188,7 @@ pub const Cache = struct {
         // Room for a few of the largest possible states, whatever the
         // capacity says.
         const arena_words = @max((budget -| fixed) / 4, 4 * (2 * nodes + class_count) + 64);
-        const total = std.math.add(usize, line * 5, scratch_words * @sizeOf(u64) + max_states * @sizeOf(State) + (arena_words + slot_count + nodes) * 4) catch return error.OutOfMemory;
+        const total = (aegis.int.Checked(usize).init(line * 5).add(scratch_words * @sizeOf(u64) + max_states * @sizeOf(State) + (arena_words + slot_count + nodes) * 4) catch return error.OutOfMemory).raw();
         c.memory = try gpa.alignedAlloc(u8, .fromByteUnits(line), total);
         var at: usize = 0;
         c.scratch = carve(u64, c.memory, &at, scratch_words);
