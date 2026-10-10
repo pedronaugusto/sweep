@@ -53,7 +53,7 @@ pub const Strategy = struct {
     }
 };
 
-fn within(reading: program_mod.Reading, subject: []const u8, lit: []const u8) bool {
+noinline fn within(reading: program_mod.Reading, subject: []const u8, lit: []const u8) bool {
     const inner = lit[1..];
     if (subject.len >= inner.len and eql(reading, subject[0..inner.len], inner)) return true;
     if (!reading.fold) return contains(subject, lit);
