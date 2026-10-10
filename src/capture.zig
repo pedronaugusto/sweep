@@ -238,3 +238,4 @@ pub const Cache = struct {
         @memcpy(c.offsets(c.next, id), c.temporary);
     }
 };
+// ci-time: a comment, so that the run after the first is warm and the sources have changed
