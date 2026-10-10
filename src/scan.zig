@@ -11,9 +11,11 @@ const direct = @import("direct.zig");
 const Allocator = std.mem.Allocator;
 const Strategy = strategy_mod.Strategy;
 
-/// Most entries of one reading that are scanned. Past it, a pass over the
-/// subject (a rolling hash and a DFA step per byte, about the cost of
-/// scanning twenty entries) is cheaper than asking every entry.
+/// Most entries of one reading that are scanned. A scan costs a few
+/// nanoseconds an entry (more for a pattern the direct reader takes), and
+/// the hashed tables with the DFA cost a step a byte of the subject, about
+/// what asking forty to fifty entries costs on paths of the benchmark's
+/// length; 32 leaves room for entries that cost more than the average.
 pub const max_entries = 32;
 
 /// How one entry is decided.

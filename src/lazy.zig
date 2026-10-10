@@ -208,10 +208,10 @@ pub const Cache = struct {
         return @as([*]T, @ptrCast(@alignCast(bytes.ptr)))[0..len]; // safe: every part starts on a line, which any element aligns to
     }
 
-    /// Bytes that `a`'s states can use: the states a set reaches grow with
-    /// its entries, about one to three for each, and each takes about
-    /// 200 bytes. Four times that, so a subject mix wider than the measured
-    /// ones still fits and does not clear.
+    /// Bytes that `a`'s states can use. The states a set reaches grow with
+    /// its entries, one to three for each in the measured sets, at about
+    /// 200 bytes a state: 2 KiB an entry holds several times that, so a
+    /// wider mix of subjects still fits and does not clear.
     fn useful(a: *const Automaton) usize {
         return 8 * 1024 +| 2 * 1024 *| @as(usize, a.entries);
     }
