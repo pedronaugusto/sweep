@@ -2,8 +2,10 @@
 const std = @import("std");
 const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
+const shake = @import("shakedown");
 
-fn escapeOne(s: gen.Source) anyerror!void {
+fn escapeOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
     var text_buf: [24]u8 = undefined;
     const options = gen.options(s);
     const text = gen.string(s, &text_buf, &gen.any_text);
@@ -26,12 +28,8 @@ fn escapeOne(s: gen.Source) anyerror!void {
     try std.testing.expectEqual(sweep.literalPrefix(pattern, options.syntax) == pattern.len, std.mem.eql(u8, pattern, text));
 }
 
-test "fuzz: an escaped literal matches itself" {
-    try std.testing.fuzz({}, gen.fuzzed(escapeOne), .{});
-}
-
-test "an escaped literal matches itself on seeded inputs" {
-    try gen.seeded(escapeOne, 0xe5c4_9e, 4000);
+test "an escaped literal matches itself" {
+    try shake.check(std.testing.allocator, {}, escapeOne, .{ .cases = 4000 });
 }
 
 test "escape quotes with brackets when escapes are off" {

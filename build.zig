@@ -68,7 +68,9 @@ pub fn build(b: *std.Build) !void {
     // import. Its error is returned last, so one configure pass asks for it
     // and for preflight together.
     var needed: error{LazyDependencyNeeded}!void = {};
-    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize })) |shakedown| {
+    // It is bound to sweep's aegis, so one aegis is linked.
+    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer })) |shakedown| {
+        if (b.lazyImport(@This(), "shakedown")) |shakedown_build| shakedown_build.useAegis(shakedown, aegis_dependency.module("aegis"));
         tests.root_module.addImport("shakedown", shakedown.module("shakedown"));
     } else |err| needed = err;
     // CI wiring. preflight is lazy and only the root build asks for it.
@@ -97,7 +99,8 @@ fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.l
     const sweep = sweepModule(b, target, optimize);
     // The root already requests this lazy test dependency. If configure
     // needs another pass, the root returns LazyDependencyNeeded below.
-    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize })) |shakedown| {
+    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer })) |shakedown| {
+        if (b.lazyImport(@This(), "shakedown")) |shakedown_build| shakedown_build.useAegis(shakedown, b.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
         return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
     } else |_| {}
     return b.allocator.dupe(std.Build.Module.Import, &.{.{ .name = "sweep", .module = sweep }}) catch @panic("OOM");

@@ -3,6 +3,7 @@
 const std = @import("std");
 const sweep = @import("../glob.zig");
 const gen = @import("gen.zig");
+const shake = @import("shakedown");
 const repeat = @import("shakedown").corpus.repeat;
 const pattern_mod = @import("../pattern.zig");
 const strategy_mod = @import("../strategy.zig");
@@ -22,7 +23,8 @@ fn compiled(pattern: []const u8, options: sweep.Options) !?Pattern {
     };
 }
 
-fn enginesOne(s: gen.Source) anyerror!void {
+fn enginesOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
     var pattern_buf: [16]u8 = undefined;
     var text_buf: [16]u8 = undefined;
     const options = gen.options(s);
@@ -59,12 +61,8 @@ fn enginesOne(s: gen.Source) anyerror!void {
     }
 }
 
-test "fuzz: every executor agrees with match, and ancestor with prefixes" {
-    try std.testing.fuzz({}, gen.fuzzed(enginesOne), .{});
-}
-
-test "every executor agrees with match on seeded inputs" {
-    try gen.seeded(enginesOne, 0xe9_9e5, 3000);
+test "every executor agrees with match" {
+    try shake.check(std.testing.allocator, {}, enginesOne, .{ .cases = 3000 });
 }
 
 /// Units a brute-force `leadsTo` tries after the directory.
@@ -98,16 +96,21 @@ fn search(pattern: []const u8, buf: []u8, len: usize, depth: usize, options: swe
     return false;
 }
 
-fn leadsOne(s: gen.Source) anyerror!void {
+fn leadsOne(_: void, c: *shake.Case) anyerror!void {
+    const s = c.source;
     var pattern_buf: [16]u8 = undefined;
     var dir_buf: [8]u8 = undefined;
     var options = gen.options(s);
     // Brackets and braces on, so each piece needs at most one unit.
     if (options.syntax.brackets == .none) options.syntax.brackets = .strict;
     options.syntax.braces = true;
+    // A star at a hidden leading dot matches nothing there, so with it a
+    // star before a dot needs a unit of its own and a rest of three units
+    // no longer reaches every pattern: the brute force would miss a match.
+    options.syntax.leading_dot = .ordinary;
     var len: usize = 0;
-    for (0..s.index(4)) |_| {
-        const piece = short_pieces[s.index(short_pieces.len)];
+    for (0..gen.index(s, 4)) |_| {
+        const piece = short_pieces[gen.index(s, short_pieces.len)];
         if (len + piece.len > pattern_buf.len) break;
         @memcpy(pattern_buf[len..][0..piece.len], piece);
         len += piece.len;
@@ -123,12 +126,18 @@ fn leadsOne(s: gen.Source) anyerror!void {
     }
 }
 
-test "leadsTo equals brute force on seeded inputs" {
-    try gen.seeded(leadsOne, 0x1ead5, 150);
+test "leadsTo equals brute force" {
+    try shake.check(std.testing.allocator, {}, leadsOne, .{ .cases = 150 });
 }
 
-test "fuzz: leadsTo equals brute force" {
-    try std.testing.fuzz({}, gen.fuzzed(leadsOne), .{});
+test "leadsTo reaches a match that needs a unit before a hidden dot" {
+    const options: sweep.Options = .{ .syntax = .{ .globstar = .off, .leading_dot = .explicit } };
+    // `/.a` is hidden from the star, `/x.a` is not.
+    try std.testing.expect(!try sweep.match("/**.a", "/.a", options));
+    try std.testing.expect(try sweep.match("/**.a", "/x.a", options));
+    var p = (try compiled("/**.a", options)) orelse return error.TestUnexpectedResult;
+    defer p.deinit();
+    try std.testing.expect(p.leadsTo(""));
 }
 
 test "base is the literal directory a walk starts from" {
