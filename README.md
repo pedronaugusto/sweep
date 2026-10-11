@@ -280,12 +280,11 @@ a caller-supplied `std.Io`.
 ## Built with
 
 - [Zig](https://ziglang.org) 0.17.0 and its standard library; nothing is linked.
-- [preflight](https://github.com/pedronaugusto/preflight) runs the source checks,
-  the tests and CI.
+- [bay](https://github.com/pedronaugusto/bay) runs sweep's development. [preflight](https://github.com/pedronaugusto/preflight) (the source checks, the tests and CI) and [shakedown](https://github.com/pedronaugusto/shakedown) (the test doubles) are dev dependencies through bay, which a project that depends on sweep never sees.
 
 ## Testing
 
-`zig build test` runs the suite and the usage example. git's own wildmatch test
+`bay test` runs the suite and the usage example. git's own wildmatch test
 vectors are committed as data, and a port of git's matcher is the reference: random
 patterns and subjects over git's alphabet must get the same answer from sweep in
 all four git modes. A naive backtracking matcher, written from the rules above, is
@@ -300,14 +299,14 @@ so small that queries finish on the NFA. The step bound is asserted on the shape
 that make backtracking exponential, at 4096 units. Every
 allocation failure in building is survived without a leak, queries are counted to
 allocate nothing, and eight threads share one set. The properties run on seeded
-inputs in every `zig build test`, and under `zig build test --fuzz` they search
+inputs in every `bay test`, and under `bay test --fuzz` they search
 further.
 
-`zig build bench` times sweep's own workloads in ReleaseFast: single patterns one-shot
+`bay bench` times sweep's own workloads in ReleaseFast: single patterns one-shot
 and compiled over a synthetic tree, compile times, set queries at 100 to 10,000 entries,
 the adversarial shapes, 9000-unit prefix and repeated-star Sets, integer ranges, regular extglobs,
 Unicode folding, captures and a pruned filesystem expansion. Run from `zig-out/bench`, `bench
---json` prints JSON lines. `zig build test` runs it once at its smallest size with
+--json` prints JSON lines. `bay test` runs it once at its smallest size with
 `--smoke`; CI times nothing.
 
 ## Licence

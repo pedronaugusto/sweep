@@ -8,6 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking
 
+- sweep is developed with [bay](https://github.com/pedronaugusto/bay): preflight and shakedown are dev dependencies, and the tests, example, checks and benchmarks are the development build's (`bay test`, `bay bench`). A project that depends on sweep fetches only aegis, as before.
 - `Set.Builder.add`, `Set.first`, `Set.last` and `Set.Ancestors.Step.last`
   return `Set.Index` instead of raw `u32`; `Set.all` appends to
   `std.ArrayList(Set.Index)`. Use `index.raw()` at caller array boundaries.

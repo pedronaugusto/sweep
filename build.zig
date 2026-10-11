@@ -1,25 +1,32 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) !void {
-    // lazyImport compares every package of the dependency tree at comptime;
-    // a large tree runs past the default quota of 1000 branches.
-    @setEvalBranchQuota(100_000);
+/// What a project that depends on sweep builds: the `sweep` module and its library.
+/// The tests, example, checks and gate are `dev`'s.
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const module = sweepModule(b, target, optimize);
-    try b.modules.put(b.allocator, "sweep", module);
-    const aegis_dependency = b.dependency("aegis", .{ .target = target, .optimize = optimize });
-    const library = b.addLibrary(.{ .name = "sweep", .root_module = module });
-    b.installArtifact(library);
-    // Everything below is this repository's own: a project depending on
-    // sweep builds the module and nothing else, and fetches only its runtime dependency.
-    if (b.pkg_hash.len != 0) return;
-    const filters = if (b.option([]const u8, "test-filter", "Select tests by name")) |filter| &.{filter} else &.{};
+    const module = b.addModule("sweep", .{ .root_source_file = b.path("src/sweep.zig"), .target = target, .optimize = optimize });
+    module.addImport("aegis", b.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
+    b.installArtifact(b.addLibrary(.{ .name = "sweep", .root_module = module }));
+}
+
+/// sweep's development: its tests, example, checks and benchmarks under
+/// preflight's gate, with shakedown bound to sweep's aegis. Run through bay.
+pub fn dev(b: *std.Build, tools: type) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const test_filter = b.option([]const u8, "test-filter", "Select tests by name");
+    const package = b.dependency("sweep", .{ .target = target, .optimize = optimize });
+    const p = package.builder;
+    const module = package.module("sweep");
+    const library = package.artifact("sweep");
+    const aegis_dependency = p.dependency("aegis", .{ .target = target, .optimize = optimize });
+    const filters = if (test_filter) |filter| &.{filter} else &.{};
     const tests = b.addTest(.{
         .name = "sweep-tests",
         .filters = filters,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tests.zig"),
+            .root_source_file = p.path("src/tests.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{.{ .name = "aegis", .module = aegis_dependency.module("aegis") }},
@@ -34,7 +41,7 @@ pub fn build(b: *std.Build) !void {
     for ([_][]const u8{ "index", "capacity" }) |name| {
         const source = b.pathJoin(&.{ "ci", "types", b.fmt("{s}.zig", .{name}) });
         const negative = b.addObject(.{ .name = b.fmt("reject-{s}", .{name}), .root_module = b.createModule(.{
-            .root_source_file = b.path(source),
+            .root_source_file = p.path(source),
             .target = target,
             .optimize = optimize,
             .imports = &.{.{ .name = "sweep", .module = module }},
@@ -46,7 +53,7 @@ pub fn build(b: *std.Build) !void {
     test_step.dependOn(domains);
     const example = b.addExecutable(.{
         .name = "usage",
-        .root_module = b.createModule(.{ .root_source_file = b.path("examples/usage.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "sweep", .module = module }} }),
+        .root_module = b.createModule(.{ .root_source_file = p.path("examples/usage.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "sweep", .module = module }} }),
     });
     const examples = b.step("examples", "Build and run the usage example");
     examples.dependOn(&b.addRunArtifact(example).step);
@@ -58,7 +65,7 @@ pub fn build(b: *std.Build) !void {
     const object = b.addObject(.{
         .name = "sweep-freestanding",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("ci/freestanding.zig"),
+            .root_source_file = p.path("ci/freestanding.zig"),
             .target = freestanding,
             .optimize = .small,
             .imports = &.{.{ .name = "sweep", .module = sweepModule(b, freestanding, .small) }},
@@ -67,52 +74,39 @@ pub fn build(b: *std.Build) !void {
     b.step("check-freestanding", "Build pure public calls for wasm32-freestanding").dependOn(&object.step);
     b.getInstallStep().dependOn(&tests.step);
     b.getInstallStep().dependOn(&example.step);
-    // The test doubles are shakedown's, a lazy dependency only the tests
-    // import. Its error is returned last, so one configure pass asks for it
-    // and for preflight together.
-    var needed: error{LazyDependencyNeeded}!void = {};
-    // It is bound to sweep's aegis, so one aegis is linked.
-    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer })) |shakedown| {
-        if (b.lazyImport(@This(), "shakedown")) |shakedown_build| shakedown_build.useAegis(shakedown, aegis_dependency.module("aegis"));
-        tests.root_module.addImport("shakedown", shakedown.module("shakedown"));
-    } else |err| needed = err;
-    // CI wiring. preflight is lazy and only the root build asks for it.
-    if (b.lazyImport(@This(), "preflight")) |preflight| {
-        preflight.addCi(b, .{
-            .tests = test_step,
-            .portable_tests = true,
-            .bench = .{
-                .programs = &.{ .{ .name = "bench", .source = "bench/main.zig" }, .{ .name = "normalization", .source = "bench/normalization.zig" }, .{ .name = "adoption", .source = "bench/adoption.zig" } },
-                .imports = benchImports,
-                .target = target,
-                .optimize = optimize,
-            },
-        });
-        // A project that depends on sweep by path, with no packages to
-        // fetch: the build a consumer gets.
-        preflight.addConsumerCheck(b, .{ .package = "sweep", .program = b.path("ci/consumer.zig"), .packages = &.{aegis_dependency}, .modules = &.{"sweep"} });
-    }
-    return needed;
+    // The test doubles are shakedown's, bound to sweep's aegis so one aegis is linked.
+    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer });
+    tools.shakedown.useAegis(shakedown, aegis_dependency.module("aegis"));
+    tests.root_module.addImport("shakedown", shakedown.module("shakedown"));
+    tools.preflight.addCi(b, p, .{
+        .tests = test_step,
+        .portable_tests = true,
+        .bench = .{
+            .programs = &.{ .{ .name = "bench", .source = "bench/main.zig" }, .{ .name = "normalization", .source = "bench/normalization.zig" }, .{ .name = "adoption", .source = "bench/adoption.zig" } },
+            .imports = benchImports,
+            .target = target,
+            .optimize = optimize,
+        },
+    });
+    // A project that depends on sweep by path, with no packages to
+    // fetch: the build a consumer gets.
+    tools.preflight.addConsumerCheck(b, p, .{ .package = "sweep", .program = p.path("ci/consumer.zig"), .packages = &.{aegis_dependency}, .modules = &.{"sweep"} });
 }
 
 /// sweep again, in the mode a benchmark builds in: an imported module keeps
 /// its own mode, so a ReleaseFast benchmark over the Debug module would
-/// time the Debug module.
+/// time the Debug module. `b` is the development build.
 fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) []const std.Build.Module.Import {
-    // lazyImport compares every package of the dependency tree at comptime;
-    // a large tree runs past the default quota of 1000 branches.
-    @setEvalBranchQuota(100_000);
+    const p = b.dependency("sweep", .{ .target = target, .optimize = optimize }).builder;
     const sweep = sweepModule(b, target, optimize);
-    // The root already requests this lazy test dependency. If configure
-    // needs another pass, the root returns LazyDependencyNeeded below.
-    if (b.dependencyLazy("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer })) |shakedown| {
-        if (b.lazyImport(@This(), "shakedown")) |shakedown_build| shakedown_build.useAegis(shakedown, b.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
-        return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
-    } else |_| {}
-    return b.allocator.dupe(std.Build.Module.Import, &.{.{ .name = "sweep", .module = sweep }}) catch @panic("OOM");
+    // The same binding as `useAegis`, which only a `dev` has the tools for.
+    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer });
+    shakedown.module("shakedown").addImport("aegis", p.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
+    return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
 }
 
 fn sweepModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) *std.Build.Module {
-    const aegis = b.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis");
-    return b.createModule(.{ .root_source_file = b.path("src/sweep.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "aegis", .module = aegis }} });
+    const p = b.dependency("sweep", .{ .target = target, .optimize = optimize }).builder;
+    const aegis = p.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis");
+    return b.createModule(.{ .root_source_file = p.path("src/sweep.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "aegis", .module = aegis }} });
 }
