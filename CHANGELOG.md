@@ -68,5 +68,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Set`: many patterns in one pass, with `any`, `first`, `last`, `all`, `ancestors` and `leadsTo`, directory-only entries, and a per-thread `Set.Cache` whose `stats` count states, clears and fallbacks.
 - `gitignore.parseLine`: one line of an ignore file, read as git reads it.
 - `isSpecial`, `literalPrefix` and `escape`.
+- Pins aegis 0.1.0.
 
 [Unreleased]: https://github.com/pedronaugusto/sweep/commits/main
