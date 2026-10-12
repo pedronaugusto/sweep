@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
 }
 
 /// sweep's development: its tests, example, checks and benchmarks under
-/// preflight's gate, with shakedown bound to sweep's aegis. Run through bay.
+/// preflight's gate. Run through bay.
 pub fn dev(b: *std.Build, tools: type) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -74,9 +74,8 @@ pub fn dev(b: *std.Build, tools: type) void {
     b.step("check-freestanding", "Build pure public calls for wasm32-freestanding").dependOn(&object.step);
     b.getInstallStep().dependOn(&tests.step);
     b.getInstallStep().dependOn(&example.step);
-    // The test doubles are shakedown's, bound to sweep's aegis so one aegis is linked.
-    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer });
-    tools.shakedown.useAegis(shakedown, aegis_dependency.module("aegis"));
+    // The test doubles are shakedown's.
+    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize });
     tests.root_module.addImport("shakedown", shakedown.module("shakedown"));
     tools.preflight.addCi(b, p, .{
         .tests = test_step,
@@ -97,11 +96,8 @@ pub fn dev(b: *std.Build, tools: type) void {
 /// its own mode, so a ReleaseFast benchmark over the Debug module would
 /// time the Debug module. `b` is the development build.
 fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) []const std.Build.Module.Import {
-    const p = b.dependency("sweep", .{ .target = target, .optimize = optimize }).builder;
     const sweep = sweepModule(b, target, optimize);
-    // The same binding as `useAegis`, which only a `dev` has the tools for.
-    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize, .aegis = .consumer });
-    shakedown.module("shakedown").addImport("aegis", p.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
+    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize });
     return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
 }
 
