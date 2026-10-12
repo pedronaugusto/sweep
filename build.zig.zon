@@ -12,13 +12,13 @@
     },
     .dev_dependencies = .{
         .preflight = .{
-            .url = "git+https://github.com/pedronaugusto/preflight#8c363bb6b25cf05218899f5296bd47143f044b49",
-            .hash = "preflight-0.1.0-LX1Zwn0XDAAnBDBA_Jw2hMeqOPR2PCs9Kq4Tt05Slj9t",
+            .url = "git+https://github.com/pedronaugusto/preflight?ref=v0.3.4#a0efa97ac6fb5656d5e2b1a19657926b66a55d11",
+            .hash = "preflight-0.3.4-LX1ZwoE8DgCcci81Z_m2wf0UmKlkxeLCGV74OcKQC8nV",
         },
 
         .shakedown = .{
-            .url = "git+https://github.com/pedronaugusto/shakedown#ceae2ca774b5ce9fef080cb0283341c8bbb83731",
-            .hash = "shakedown-0.1.0-BR8U40rLFQBHUACfuCT-JBKc_u7isvLkPEETOyurjBK6",
+            .url = "git+https://github.com/pedronaugusto/shakedown?ref=v0.2.5#ca67fa3c62c3a9246cd5d3db8851fb03a3fbeb11",
+            .hash = "shakedown-0.2.5-BR8U4zoqFgCH2wFglVuAbn9V6isnsbuApDuroqY5NR0Z",
         },
     },
 }
