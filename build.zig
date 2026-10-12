@@ -97,8 +97,7 @@ pub fn dev(b: *std.Build, tools: type) void {
 /// time the Debug module. `b` is the development build.
 fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) []const std.Build.Module.Import {
     const sweep = sweepModule(b, target, optimize);
-    const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize });
-    return b.allocator.dupe(std.Build.Module.Import, &.{ .{ .name = "sweep", .module = sweep }, .{ .name = "shakedown", .module = shakedown.module("shakedown") } }) catch @panic("OOM");
+    return b.allocator.dupe(std.Build.Module.Import, &.{.{ .name = "sweep", .module = sweep }}) catch @panic("OOM");
 }
 
 fn sweepModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) *std.Build.Module {
