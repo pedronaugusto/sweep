@@ -238,6 +238,7 @@ offset and the reason.
 | `set.ancestors(cache, path, kind)` | One pass over every prefix of a path: the last entry matching each, and whether anything below can |
 | `set.leadsTo(cache, dir)` | Whether anything below `dir` could match |
 | `gitignore.parseLine(line)` | One ignore-file line: its pattern, `Set.Entry` and whether it is negated |
+| `gitignore.parsePattern(text)` | One pattern as given, without a file's comments and trimming (git's `parse_path_pattern`, as `git clean -e` adds one) |
 | `isSpecial`, `literalPrefix`, `escape` | Which bytes are special; the plain leading run; a literal written as a pattern |
 
 A set's entries share primary and alternate separators (`error.SeparatorMismatch`

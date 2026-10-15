@@ -23,7 +23,16 @@ pub fn parseLine(line_in: []const u8) ?Line {
     var line = line_in;
     if (line.len > 0 and line[line.len - 1] == '\r') line = line[0 .. line.len - 1];
     if (line.len == 0 or line[0] == '#') return null;
-    var text = trimTrailingSpaces(line);
+    return parsePattern(trimTrailingSpaces(line));
+}
+
+/// Reads one pattern as given, with none of a file's line grammar: no
+/// comment, no trailing spaces or CR trimmed. git's `parse_path_pattern`,
+/// what `git clean -e` and `git ls-files -x` add. A leading `!` negates, a
+/// trailing `/` takes directories only, and a `/` anywhere but at the end
+/// anchors the glob; null when no pattern remains.
+pub fn parsePattern(text_in: []const u8) ?Line {
+    var text = text_in;
     if (text.len == 0) return null;
     const negated = text[0] == '!';
     if (negated) text = text[1..];
@@ -57,6 +66,16 @@ fn trimTrailingSpaces(line: []const u8) []const u8 {
         else => last_space = null,
     };
     return line[0 .. last_space orelse line.len];
+}
+
+test parsePattern {
+    try std.testing.expectEqualStrings("#notes", parsePattern("#notes").?.pattern);
+    try std.testing.expectEqualStrings("trail  ", parsePattern("trail  ").?.pattern);
+    try std.testing.expectEqualStrings("cr\r", parsePattern("cr\r").?.pattern);
+    const kept = parsePattern("!keep/").?;
+    try std.testing.expect(kept.negated and kept.entry.dir_only and kept.entry.options.anywhere);
+    try std.testing.expect(parsePattern("") == null);
+    try std.testing.expect(parsePattern("!/") == null);
 }
 
 test parseLine {
