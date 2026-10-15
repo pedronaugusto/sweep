@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-15
+
+### Added
+
+- `gitignore.parsePattern`: one pattern as given, git's `parse_path_pattern`, with none of an ignore file's line grammar (no comment, trailing spaces or CR); `parseLine` is that after the line's own steps. What `git clean -e` and `git ls-files -x` add.
+
 ## [0.2.3] - 2026-10-14
 
 ### Changed
