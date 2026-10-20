@@ -301,7 +301,10 @@ that make backtracking exponential, at 4096 units. Every
 allocation failure in building is survived without a leak, queries are counted to
 allocate nothing, and eight threads share one set. The properties run on seeded
 inputs in every `bay test`, and under `bay test --fuzz` they search
-further.
+further. The release tier runs the hardened profile: `bay hardened` (the suite
+with safety on and `std.testing.allocator` on shakedown's quarantine),
+`bay hardened-fuzz` (the properties under Zig's fuzzer) and, on x86_64 or
+aarch64 Linux, `bay hardened-tsan` (the suite under ThreadSanitizer).
 
 `bay bench` times sweep's own workloads in ReleaseFast: single patterns one-shot
 and compiled over a synthetic tree, compile times, set queries at 100 to 10,000 entries,

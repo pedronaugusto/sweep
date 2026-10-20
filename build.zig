@@ -80,6 +80,9 @@ pub fn dev(b: *std.Build, tools: type) void {
     tools.preflight.addCi(b, p, .{
         .tests = test_step,
         .portable_tests = true,
+        // The release tier fuzzes the properties and runs the suite under
+        // ThreadSanitizer, where eight threads share one set.
+        .hardened = .{ .fuzz_step = "test", .tsan_step = "test" },
         .bench = .{
             .programs = &.{ .{ .name = "bench", .source = "bench/main.zig" }, .{ .name = "normalization", .source = "bench/normalization.zig" }, .{ .name = "adoption", .source = "bench/adoption.zig" } },
             .imports = benchImports,
