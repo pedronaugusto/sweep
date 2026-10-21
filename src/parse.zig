@@ -12,7 +12,6 @@ const integer = @import("integer.zig");
 const unicode = @import("unicode.zig");
 
 const Builder = program.Builder;
-const Node = program.Node;
 const Code = unit.Code;
 
 pub const Error = syntax.PatternError;
