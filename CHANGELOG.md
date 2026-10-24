@@ -10,6 +10,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Development: the lint gates the aegis pack, glint's A001-A005.
 - Development: the suite runs under the release tier's hardened profile (`bay hardened`, `bay hardened-fuzz`, `bay hardened-tsan`).
+- Pins aegis 0.1.17.
 
 ## [0.2.4] - 2026-10-15
 
