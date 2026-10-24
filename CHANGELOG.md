@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-24
+
 ### Changed
 
 - Development: the lint gates the aegis pack, glint's A001-A005.
