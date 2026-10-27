@@ -1,6 +1,7 @@
 //! Optional filesystem expansion. The matcher stays pure; the walk owns
 //! directory handles and path buffers and takes Io on every blocking call.
 const std = @import("std");
+const aegis = @import("aegis");
 const glob = @import("glob.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -41,7 +42,11 @@ pub const Matcher = union(enum) {
 pub const Walk = struct {
     /// Private: allocations and directory stack owned by this walk.
     gpa: Allocator,
-    frames: std.ArrayList(Frame) = .empty,
+    /// The directories open, outermost first. Each lives in `pool`, so it
+    /// stays where it is while the stack grows: its handle has one owner,
+    /// at one address.
+    frames: std.ArrayList(*Frame) = .empty,
+    pool: std.heap.MemoryPool(Frame) = .empty,
     path: std.ArrayList(u8) = .empty,
     matcher: Matcher,
     options: Options,
@@ -68,7 +73,7 @@ pub const Walk = struct {
     pub const NextError = OpenError || Io.Dir.Iterator.Error || Io.Dir.StatFileError;
 
     const Frame = struct {
-        dir: Io.Dir,
+        dir: OwnedDir,
         iterator: Io.Dir.Iterator,
         prefix: usize,
         canonical: ?[]u8,
@@ -95,7 +100,7 @@ pub const Walk = struct {
                 walk.clear(io);
                 return walk;
             }
-            const parent = walk.frames.items[walk.frames.items.len - 1].dir;
+            const parent = walk.frames.items[walk.frames.items.len - 1].dir.borrow().*;
             const child = parent.openDir(io, component, .{ .iterate = true, .follow_symlinks = options.follow_symlinks }) catch |err| switch (err) {
                 error.FileNotFound, error.NotDir, error.SymLinkLoop => {
                     walk.clear(io);
@@ -122,6 +127,7 @@ pub const Walk = struct {
     pub fn deinit(w: *Walk, io: Io) void {
         w.clear(io);
         w.frames.deinit(w.gpa);
+        w.pool.deinit(w.gpa);
         w.path.deinit(w.gpa);
         if (w.sorted) |*paths| paths.deinit();
         w.* = undefined;
@@ -146,7 +152,7 @@ pub const Walk = struct {
 
     fn nextRaw(w: *Walk, io: Io) NextError!?Entry {
         while (w.frames.items.len > 0) {
-            const frame = &w.frames.items[w.frames.items.len - 1];
+            const frame = w.frames.items[w.frames.items.len - 1];
             const item = (try frame.iterator.next(io)) orelse {
                 w.pop(io);
                 continue;
@@ -157,7 +163,7 @@ pub const Walk = struct {
             try w.path.appendSlice(w.gpa, item.name);
             var kind = item.kind;
             if (kind == .unknown or (kind == .sym_link and w.options.follow_symlinks)) {
-                const stat = frame.dir.statFile(io, item.name, .{ .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
+                const stat = frame.dir.borrow().statFile(io, item.name, .{ .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
                     error.FileNotFound, error.SymLinkLoop => continue,
                     else => return err,
                 };
@@ -167,7 +173,7 @@ pub const Walk = struct {
             const entry: Entry = .{ .path = w.path.items, .kind = if (directory) .dir else .file };
             const matched = (!directory or !w.options.files_only) and w.matcher.matches(entry.path, entry.kind);
             if (directory and w.matcher.leads(entry.path)) {
-                const child = frame.dir.openDir(io, item.name, .{ .iterate = true, .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
+                const child = frame.dir.borrow().openDir(io, item.name, .{ .iterate = true, .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
                     error.FileNotFound, error.NotDir, error.SymLinkLoop => if (matched) return entry else continue,
                     else => return err,
                 };
@@ -193,18 +199,30 @@ pub const Walk = struct {
             };
             canonical = try w.gpa.dupe(u8, buffer[0..len]);
         }
-        try w.frames.append(w.gpa, .{ .dir = dir, .iterator = dir.iterate(), .prefix = prefix, .canonical = canonical });
+        try w.frames.ensureUnusedCapacity(w.gpa, 1);
+        const frame = try w.pool.create(w.gpa);
+        // The frame owns `dir` from here.
+        frame.* = .{ .dir = .init(dir), .iterator = dir.iterate(), .prefix = prefix, .canonical = canonical };
+        w.frames.appendAssumeCapacity(frame);
         return true;
     }
     fn pop(w: *Walk, io: Io) void {
         const frame = w.frames.pop().?;
-        frame.dir.close(io);
+        frame.dir.deinit(io);
         if (frame.canonical) |name| w.gpa.free(name);
+        w.pool.destroy(frame);
     }
     fn clear(w: *Walk, io: Io) void {
         while (w.frames.items.len > 0) w.pop(io);
     }
 };
+
+/// A directory handle with one owner, closed once.
+const OwnedDir = aegis.own.OwnedIo(Io.Dir, closeDir);
+
+fn closeDir(handle: *Io.Dir, io: Io) void {
+    handle.close(io);
+}
 
 /// Owned expansion results. Paths stay valid until deinit.
 pub const Paths = struct {

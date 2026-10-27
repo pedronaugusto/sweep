@@ -293,8 +293,7 @@ pub const Set = struct {
     };
 
     /// The best prefix-strategy entries an `ancestors` pass has met.
-    // aegis: measured-boundary: docs/design.md#safety-boundaries; private query indices come only from validated dense set entries.
-    const Prefixes = struct {
+    pub const Prefixes = struct {
         set: ?*const Set = null,
         any: ?u32 = null,
         file: ?u32 = null,
@@ -437,7 +436,6 @@ pub const Set = struct {
 };
 
 /// Collects matching entries for one query.
-// aegis: measured-boundary: docs/design.md#safety-boundaries; kernels offer validated entry indices; typed public results are constructed at this boundary.
 pub const Accumulator = struct {
     set: *const Set,
     kind: file.Kind,
@@ -488,7 +486,6 @@ const Part = struct {
     reading: program_mod.Reading,
     strategies: tables.Strategies,
     automaton: lazy.Automaton,
-    // aegis: design: docs/design.md#safety-boundaries; this private entry index is installed only from the validated insertion-order enumeration.
     single: ?struct { source: []u8, compiled: direct.Compiled, index: u32 } = null,
     /// The entries asked one at a time, when there are few enough, in place of the tables and the DFA for `run`.
     scan: ?scan_mod.Scan = null,

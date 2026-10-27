@@ -66,7 +66,6 @@ const Last = enum {
 
 const Tri = enum { yes, no, maybe };
 
-// aegis: measured-boundary: docs/design.md#safety-boundaries; source and scratch cursors are bounded by their slices before each read or emit.
 const Parser = struct {
     b: *Builder,
     pattern: []const u8,
@@ -206,7 +205,6 @@ const Parser = struct {
         _ = try p.b.emit(.accept, aegis.int.cast(u28, shifted.raw() | @intFromBool(entry.dir_only)) catch return error.Full);
     }
 
-    // aegis: design: docs/design.md#safety-boundaries; capture ordinals are issued only during the bounded tagged-program build.
     fn startCapture(p: *Parser) RunError!?u32 {
         if (!p.b.capture) return null;
         const id = p.b.capture_count;

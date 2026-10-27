@@ -54,7 +54,6 @@ pub const Op = enum(u4) {
 };
 
 /// One node: an operation and its operand.
-// aegis: safe-type-internals: docs/design.md#safety-boundaries; the packed operand holds several op-selected domains, validated by construction.
 pub const Node = packed struct(u32) {
     op: Op,
     arg: u28,
@@ -172,7 +171,6 @@ pub const Program = struct {
 
     /// Tests a unit folded once for all threads. Raw codes retain separator
     /// and leading-dot meaning even when their canonical code aliases one.
-    // aegis: measured-boundary: docs/design.md#safety-boundaries; the executor supplies a validated node index; all comparisons retain packed scalar form.
     pub fn consumesCanonical(p: Program, k: usize, code: unit.Code, canonical: unit.Code, start: bool) bool {
         const node = p.nodes[k];
         const r = p.reading;
@@ -223,7 +221,6 @@ pub fn operandAfter(position: Position, by: u32) Builder.Full!u28 {
 }
 
 /// Room a program is built into: fixed slices, filled from the front.
-// aegis: measured-boundary: docs/design.md#safety-boundaries; slice cursors are validated at emit and remain raw within one construction pass.
 pub const Builder = struct {
     nodes: []Node,
     classes: []Class,
@@ -276,7 +273,6 @@ pub const Bounds = struct {
     pub fn of(pattern: []const u8, options: syntax.Options) Error!Bounds {
         var brackets: usize = 0;
         var braces: usize = 0;
-        // aegis: no-danger: docs/design.md#safety-boundaries; each counter is bounded by the source slice.
         for (pattern) |c| switch (c) {
             '[' => brackets += 1,
             '{', '(' => braces += 1,

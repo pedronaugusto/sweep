@@ -9,7 +9,6 @@ const Allocator = std.mem.Allocator;
 const Context = program_mod.Context;
 
 /// Byte offsets of a captured wildcard or group in the original subject.
-// aegis: no-danger: docs/design.md#safety-boundaries; both endpoints are original subject byte offsets, with no other domain or arithmetic in the result.
 pub const Capture = struct { start: usize, end: usize };
 /// The caller's output has fewer slots than the pattern's capture count.
 pub const MatchError = error{BufferTooSmall};
@@ -44,7 +43,6 @@ pub const Cache = struct {
     start: bool = true,
 
     const unset = std.math.maxInt(usize);
-    // aegis: measured-boundary: docs/design.md#safety-boundaries; validated tagged-program states and history offsets stay raw in the allocation-free executor.
     const Kernel = struct { ids: []u32, histories: []usize, len: usize = 0 };
 
     /// Used by Pattern.captureCache after the source has been validated.

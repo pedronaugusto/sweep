@@ -1,7 +1,6 @@
 //! NFC over valid scalars; malformed bytes are distinct barriers. No heap,
 //! recursion, stream-safe truncation or limit on a combining sequence.
 //! Ordering uses at most 255 stable passes over each segment, O(n).
-// aegis: no-danger: docs/design.md#safety-boundaries; scalar codes, combining classes and source cursors have separate fields and are bounded by Unicode data or the borrowed slice.
 const std = @import("std");
 const data = @import("composition.zig");
 const unit = @import("unit.zig");
@@ -77,7 +76,7 @@ const Raw = struct {
         return r.at;
     }
 };
-const Ordered = struct {
+pub const Ordered = struct {
     first: Raw,
     end: Raw,
     cursor: Raw,

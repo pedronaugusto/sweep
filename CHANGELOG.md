@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Breaking
+
+- `Walk.frames`, private, holds pointers to frames that live in the walk's own pool, each frame's directory with one owner (aegis's `own.OwnedIo`), where it held the frames by value and their handles bare. A walk is used as before.
+
+### Changed
+
+- Under the aegis pack on aegis 0.2.1: the lazy automaton's arrays are placed in its line-aligned memory through one checked conversion (the memory's declared alignment at compile time, each part's offset asserted); a pattern's in-place capacities are read from `match.Storage`'s type, not from storage still undefined; `normal.Ordered` and `Set.Prefixes`, which public functions take, are public types. Escapes that named no reason the pack knows, or suppressed nothing, are gone.
+
 ## [0.2.5] - 2026-10-24
 
 ### Changed

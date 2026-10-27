@@ -3,7 +3,6 @@
 const std = @import("std");
 const program = @import("program.zig");
 
-// aegis: design: docs/design.md#safety-boundaries; parseInt checks both signed bounds in every mode and read rejects descending intervals.
 pub const Interval = struct { lo: i64, hi: i64, end: usize };
 pub const ReadError = error{InvalidRange};
 
@@ -55,7 +54,6 @@ const Compiler = struct {
     b: *program.Builder,
     split: ?program.Position = null,
     jumps: program.Position = program.no_jump,
-    // aegis: no-danger: docs/design.md#safety-boundaries; these private values index only the interned decimal classes.
     digits: [10][10]?u32 = @splat(@splat(null)),
 
     fn branch(c: *Compiler) CompileError!void {
@@ -86,7 +84,6 @@ const Compiler = struct {
         _ = try c.b.emit(.class, @intCast(id));
     }
 
-    // aegis: measured-boundary: docs/design.md#safety-boundaries; read validates signed endpoints; magnitudes stay within 0..2^63 and each step checks remaining room.
     fn magnitude(c: *Compiler, sign: ?u8, low: u64, high: u64) CompileError!void {
         var cur = low;
         while (cur <= high) {

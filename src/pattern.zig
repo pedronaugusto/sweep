@@ -77,6 +77,11 @@ pub const Pattern = struct {
 
     /// Compiles `pattern`, which is copied: nothing stays borrowed. Longer
     /// than `max_units` units is `error.PatternTooLong`.
+    /// How many of a part `match_mod.Storage` holds in place.
+    fn capacity(comptime part: std.meta.FieldEnum(match_mod.Storage)) usize {
+        return @typeInfo(@FieldType(match_mod.Storage, @tagName(part))).array.len;
+    }
+
     pub fn compile(gpa: Allocator, pattern: []const u8, options: syntax.Options) CompileError!Pattern {
         if (pattern.len > max_units and unit.count(options.syntax.unit == .utf8 or options.case == .unicode or options.normalization == .nfc, pattern) > max_units) {
             if (options.diagnostics) |d| d.* = .{ .offset = 0, .reason = .too_long };
@@ -87,7 +92,7 @@ pub const Pattern = struct {
             return compileLiteral(gpa, pattern, options);
         const bounds: program_mod.Bounds = try program_mod.Bounds.of(pattern, options);
         var storage: match_mod.Storage = undefined;
-        const small = bounds.fits(.{ .nodes = .fromRaw(storage.nodes.len), .classes = .fromRaw(storage.classes.len), .ranges = .fromRaw(storage.ranges.len), .frames = .fromRaw(storage.frames.len) });
+        const small = bounds.fits(.{ .nodes = .fromRaw(capacity(.nodes)), .classes = .fromRaw(capacity(.classes)), .ranges = .fromRaw(capacity(.ranges)), .frames = .fromRaw(capacity(.frames)) });
         var b: program_mod.Builder = .{
             .nodes = if (small) &storage.nodes else try gpa.alloc(program_mod.Node, bounds.nodes.raw()),
             .classes = &.{},

@@ -142,7 +142,6 @@ const State = struct {
 };
 
 /// One thread's states for one automaton, in a fixed allocation.
-// aegis: measured-boundary: docs/design.md#safety-boundaries; cache state/arena indices remain private and valid only until the next clear; typed byte capacity enters at Set.Cache.init.
 pub const Cache = struct {
     automaton: *const Automaton,
     /// Everything below, in one allocation.
@@ -204,9 +203,13 @@ pub const Cache = struct {
     /// The next `len` elements of `memory`, from `at`, which advances to
     /// the line after them: each array starts on a cache line of its own.
     fn carve(comptime T: type, memory: []align(line) u8, at: *usize, len: usize) []T {
+        comptime std.debug.assert(line >= @alignOf(T));
+        std.debug.assert(std.mem.isAligned(at.*, line));
         const bytes = memory[at.*..][0 .. len * @sizeOf(T)];
         at.* = std.mem.alignForward(usize, at.* + bytes.len, line);
-        return @as([*]T, @ptrCast(@alignCast(bytes.ptr)))[0..len]; // safe: every part starts on a line, which any element aligns to
+        // aegis: internal: `memory` is declared line-aligned and the part starts on a line (both asserted above), which aligns a `T`
+        const part: []align(line) u8 = @alignCast(bytes);
+        return std.mem.bytesAsSlice(T, part);
     }
 
     /// Bytes that `a`'s states can use. The states a set reaches grow with
