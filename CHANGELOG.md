@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-27
+
 ### Breaking
 
 - `Walk.frames`, private, holds pointers to frames that live in the walk's own pool, each frame's directory with one owner (aegis's `own.OwnedIo`), where it held the frames by value and their handles bare. A walk is used as before.
