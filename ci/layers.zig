@@ -41,6 +41,7 @@ pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "line grammar", .patterns = &.{
         "src/gitignore.zig",
     } },
+    .{ .name = "ignore stacks", .patterns = &.{"src/ignore.zig"} },
     .{ .name = "glob facade", .patterns = &.{"src/glob.zig"} },
     .{ .name = "walking", .patterns = &.{"src/walk.zig"} },
     .{ .name = "public", .patterns = &.{

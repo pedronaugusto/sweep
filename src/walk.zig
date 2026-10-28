@@ -3,6 +3,7 @@
 const std = @import("std");
 const aegis = @import("aegis");
 const glob = @import("glob.zig");
+const ignore = @import("ignore.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
@@ -10,29 +11,34 @@ const Io = std.Io;
 pub const Matcher = union(enum) {
     pattern: *const glob.Pattern,
     set: struct { set: *const glob.Set, cache: *glob.Set.Cache },
+    /// Every path: a walk that only an ignore stack narrows.
+    everything,
 
     fn matches(m: Matcher, path: []const u8, kind: glob.Kind) bool {
         return switch (m) {
             .pattern => |p| p.matches(path),
             .set => |s| s.set.any(s.cache, path, kind),
+            .everything => true,
         };
     }
     fn leads(m: Matcher, dir: []const u8) bool {
         return switch (m) {
             .pattern => |p| p.leadsTo(dir),
             .set => |s| s.set.leadsTo(s.cache, dir),
+            .everything => true,
         };
     }
     fn separator(m: Matcher) ?u8 {
         return switch (m) {
             .pattern => |p| p.options.syntax.separator,
             .set => |s| s.set.separator,
+            .everything => '/',
         };
     }
     fn base(m: Matcher) []const u8 {
         return switch (m) {
             .pattern => |p| if (!p.reading.fold) p.base() else "",
-            .set => "",
+            .set, .everything => "",
         };
     }
 };
@@ -64,11 +70,18 @@ pub const Walk = struct {
         files_only: bool = false,
         /// Lexical ordering collects matches before returning the first one.
         order: enum { filesystem, lexical } = .filesystem,
+        /// Ignore files, stacked as the walk goes: each directory's
+        /// (`ignore.Options.file_names`) are read through the handle the
+        /// walk holds as it enters, and dropped as it leaves, and an
+        /// excluded entry is neither returned nor entered. The stack holds
+        /// the caller's levels below them; it is borrowed, and asked by this
+        /// walk alone while it runs.
+        ignore: ?*ignore.Stack = null,
     };
     /// A path relative to `dir`, borrowed until the next call or deinit.
     pub const Entry = struct { path: []const u8, kind: glob.Kind };
     /// Opening, reading or allocating the expansion failed.
-    pub const OpenError = Allocator.Error || Io.Dir.OpenError || Io.Dir.RealPathError || error{InvalidSeparator};
+    pub const OpenError = Allocator.Error || Io.Dir.OpenError || Io.Dir.RealPathError || ignore.FileError || error{InvalidSeparator};
     /// Traversal failed; the walk remains valid and still needs deinit.
     pub const NextError = OpenError || Io.Dir.Iterator.Error || Io.Dir.StatFileError;
 
@@ -77,6 +90,8 @@ pub const Walk = struct {
         iterator: Io.Dir.Iterator,
         prefix: usize,
         canonical: ?[]u8,
+        /// Where the ignore stack stood below this directory's files.
+        mark: ignore.Mark,
     };
 
     /// Opens a walk, starting at a sensitive pattern's invariant base.
@@ -87,10 +102,7 @@ pub const Walk = struct {
         errdefer walk.deinit(io);
         if (!matcher.leads("")) return walk;
         const root = try dir.openDir(io, ".", .{ .iterate = true });
-        _ = walk.push(io, root, 0) catch |err| {
-            root.close(io);
-            return err;
-        };
+        _ = try walk.push(io, root, 0);
         // Open each base component separately, so no-follow also applies
         // to symlinks in the middle of the base.
         var components = std.mem.splitScalar(u8, matcher.base(), '/');
@@ -100,6 +112,12 @@ pub const Walk = struct {
                 walk.clear(io);
                 return walk;
             }
+            if (walk.path.items.len > 0) try walk.path.append(gpa, '/');
+            try walk.path.appendSlice(gpa, component);
+            if (options.ignore) |stack| if (stack.match(walk.path.items, .dir).excluded) {
+                walk.clear(io);
+                return walk;
+            };
             const parent = walk.frames.items[walk.frames.items.len - 1].dir.borrow().*;
             const child = parent.openDir(io, component, .{ .iterate = true, .follow_symlinks = options.follow_symlinks }) catch |err| switch (err) {
                 error.FileNotFound, error.NotDir, error.SymLinkLoop => {
@@ -108,16 +126,15 @@ pub const Walk = struct {
                 },
                 else => return err,
             };
-            errdefer child.close(io);
-            if (walk.path.items.len > 0) try walk.path.append(gpa, '/');
-            try walk.path.appendSlice(gpa, component);
             if (!try walk.push(io, child, walk.path.items.len)) {
                 walk.clear(io);
                 return walk;
             }
-            // The base is invariant: ancestors need not be enumerated.
+            // The base is invariant: ancestors need not be enumerated, but
+            // their ignore files still apply below them.
             const current = walk.frames.pop().?;
-            walk.clear(io);
+            current.mark = walk.frames.items[0].mark;
+            while (walk.frames.items.len > 0) walk.close(io, walk.frames.pop().?);
             walk.frames.appendAssumeCapacity(current);
         }
         return walk;
@@ -171,25 +188,26 @@ pub const Walk = struct {
             }
             const directory = kind == .directory;
             const entry: Entry = .{ .path = w.path.items, .kind = if (directory) .dir else .file };
+            if (w.options.ignore) |stack| if (stack.match(entry.path, entry.kind).excluded) continue;
             const matched = (!directory or !w.options.files_only) and w.matcher.matches(entry.path, entry.kind);
             if (directory and w.matcher.leads(entry.path)) {
                 const child = frame.dir.borrow().openDir(io, item.name, .{ .iterate = true, .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
                     error.FileNotFound, error.NotDir, error.SymLinkLoop => if (matched) return entry else continue,
                     else => return err,
                 };
-                _ = w.push(io, child, w.path.items.len) catch |err| {
-                    child.close(io);
-                    return err;
-                };
+                _ = try w.push(io, child, w.path.items.len);
             }
             if (matched) return entry;
         }
         return null;
     }
 
+    /// Takes `dir`: a frame's from here, or closed.
     fn push(w: *Walk, io: Io, dir: Io.Dir, prefix: usize) OpenError!bool {
+        var held = false;
+        errdefer if (!held) dir.close(io);
         var canonical: ?[]u8 = null;
-        errdefer if (canonical) |name| w.gpa.free(name);
+        errdefer if (!held) if (canonical) |name| w.gpa.free(name);
         if (w.options.follow_symlinks) {
             var buffer: [std.fs.max_path_bytes]u8 = undefined;
             const len = try dir.realPath(io, &buffer);
@@ -202,12 +220,25 @@ pub const Walk = struct {
         try w.frames.ensureUnusedCapacity(w.gpa, 1);
         const frame = try w.pool.create(w.gpa);
         // The frame owns `dir` from here.
-        frame.* = .{ .dir = .init(dir), .iterator = dir.iterate(), .prefix = prefix, .canonical = canonical };
+        const mark: ignore.Mark = if (w.options.ignore) |stack| stack.mark() else @fromBackingInt(@intCast(0));
+        frame.* = .{ .dir = .init(dir), .iterator = dir.iterate(), .prefix = prefix, .canonical = canonical, .mark = mark };
         w.frames.appendAssumeCapacity(frame);
+        held = true;
+        if (w.options.ignore) |stack| stack.addDirectory(io, dir, w.path.items[0..prefix]) catch |err| {
+            // A directory whose files could not all be read is not walked:
+            // its entries would be decided without a level.
+            w.pop(io);
+            return err;
+        };
         return true;
     }
     fn pop(w: *Walk, io: Io) void {
         const frame = w.frames.pop().?;
+        if (w.options.ignore) |stack| stack.popTo(frame.mark);
+        w.close(io, frame);
+    }
+    /// Closes a frame taken off the stack, its ignore levels left as they are.
+    fn close(w: *Walk, io: Io, frame: *Frame) void {
         frame.dir.deinit(io);
         if (frame.canonical) |name| w.gpa.free(name);
         w.pool.destroy(frame);
