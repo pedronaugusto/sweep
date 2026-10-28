@@ -69,7 +69,7 @@ pub const Unreadable = enum {
 };
 
 /// Reading a file failed.
-pub const ReadError = aegis.own.ReadFileError || Io.Dir.StatFileError || Io.Dir.OpenError || error{
+pub const ReadError = aegis.own.ReadFileError || aegis.own.ReadOpenedError || Io.Dir.OpenError || error{
     /// The file holds more than `Options.max_file` bytes; git skips one
     /// over its 100 MiB.
     FileTooLarge,
@@ -248,14 +248,21 @@ pub const Stack = struct {
     }
 
     fn read(s: *Stack, io: Io, dir: Io.Dir, path: []const u8, links: Links) ReadError!?[]u8 {
-        if (links == .refuse) {
-            const found = dir.statFile(io, path, .{ .follow_symlinks = false }) catch |err| switch (err) {
-                error.FileNotFound => return null,
-                else => |e| return e,
-            };
-            if (found.kind == .sym_link) return error.LinkRefused;
-        }
-        return aegis.own.readFile(io, dir, path, s.gpa, s.options.max_file) catch |err| switch (err) {
+        const bytes = switch (links) {
+            .follow => aegis.own.readFile(io, dir, path, s.gpa, s.options.max_file),
+            .refuse => opened: {
+                // The open itself refuses a link (`O_NOFOLLOW`, git's
+                // `open_nofollow`): nothing is looked at before it.
+                const file = dir.openFile(io, path, .{ .follow_symlinks = false }) catch |err| switch (err) {
+                    error.FileNotFound => return null,
+                    error.SymLinkLoop => return error.LinkRefused,
+                    else => |e| return e,
+                };
+                defer file.close(io);
+                break :opened aegis.own.readOpened(io, file, s.gpa, s.options.max_file);
+            },
+        };
+        return bytes catch |err| switch (err) {
             error.FileNotFound => null,
             error.StreamTooLong => error.FileTooLarge,
             else => |e| e,

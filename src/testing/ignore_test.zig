@@ -198,6 +198,9 @@ test "t0008: whitespace, quoting and backslashes" {
 }
 
 test "t0008: links followed in the global files, refused in the tree" {
+    // A symbolic link needs a privilege on Windows, and git there opens
+    // without O_NOFOLLOW.
+    if (@import("builtin").target.os.tag == .windows) return error.SkipZigTest;
     const io = std.testing.io;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
