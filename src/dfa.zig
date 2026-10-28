@@ -468,7 +468,7 @@ pub const Stepper = struct {
     /// consumes `code`, into `out`; returns its length.
     pub fn next(s: *Stepper, kernel: []const u32, at_start: bool, code: Code, out: []u32) usize {
         for (s.sim.kernel) |*w| w.* = 0;
-        for (kernel) |k| s.sim.kernel[k / 64] |= @as(u64, 1) << @intCast(k % 64);
+        for (kernel) |k| s.sim.kernel[k / 64] |= @as(u64, 1) << @as(u6, @truncate(k));
         s.sim.start = at_start;
         s.sim.units = 0;
         s.sim.steps = 0;

@@ -33,11 +33,13 @@ pub const CompileError = program.Builder.Full;
 /// with optional `+` for nonnegative integers and `-` for negative ones.
 pub fn compile(b: *program.Builder, interval: Interval) CompileError!void {
     var compiler: Compiler = .{ .b = b };
-    if (interval.lo < 0) try compiler.magnitude('-', @intCast(-@as(i128, @min(interval.hi, -1))), @intCast(-@as(i128, interval.lo)));
+    // Each side by its magnitude: `@abs` of an i64 is its u64 magnitude,
+    // the most negative one included.
+    if (interval.lo < 0) try compiler.magnitude('-', @abs(@min(interval.hi, -1)), @abs(interval.lo));
     if (interval.hi >= 0) {
-        const lo: u64 = @intCast(@max(interval.lo, 0));
-        try compiler.magnitude(null, lo, @intCast(interval.hi));
-        try compiler.magnitude('+', lo, @intCast(interval.hi));
+        const lo = @abs(@max(interval.lo, 0));
+        try compiler.magnitude(null, lo, @abs(interval.hi));
+        try compiler.magnitude('+', lo, @abs(interval.hi));
         if (lo == 0) try compiler.magnitude('-', 0, 0);
     }
     const end = b.node_len;
@@ -99,7 +101,8 @@ const Compiler = struct {
             try c.branch();
             if (sign) |s| _ = try c.b.emit(.lit, s);
             var buf: [20]u8 = undefined;
-            const prefix = std.mem.print(&buf, "{d}", .{quotient / 10}) catch unreachable; // unreachable: u64 has at most twenty digits
+            // Twenty bytes hold every u64's digits.
+            const prefix = buf[0..std.fmt.printInt(&buf, quotient / 10, 10, .lower, .{})];
             if (quotient >= 10) {
                 for (prefix) |byte| _ = try c.b.emit(.lit, byte);
             }

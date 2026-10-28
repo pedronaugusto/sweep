@@ -41,15 +41,15 @@ pub const Class = struct {
     }
 
     pub fn hasLow(class: *const Class, byte: u8) bool {
-        return class.low[byte >> 6] >> @intCast(byte & 63) & 1 != 0;
+        return class.low[byte >> 6] >> @as(u6, @truncate(byte)) & 1 != 0;
     }
 
     pub fn setLow(class: *Class, byte: u8) void {
-        class.low[byte >> 6] |= @as(u64, 1) << @intCast(byte & 63);
+        class.low[byte >> 6] |= @as(u64, 1) << @as(u6, @truncate(byte));
     }
 
     pub fn clearLow(class: *Class, byte: u8) void {
-        class.low[byte >> 6] &= ~(@as(u64, 1) << @intCast(byte & 63));
+        class.low[byte >> 6] &= ~(@as(u64, 1) << @as(u6, @truncate(byte)));
     }
 
     /// Whether the class holds any code at all.

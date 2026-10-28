@@ -110,21 +110,16 @@ const Parser = struct {
             if (extended and sx.extglob and c == '!' and i + 1 < pattern.len and pattern[i + 1] == '(') return p.fail(.unsupported_extglob, i);
             const literal_bracket = if (extended and c == '[' and sx.brackets != .none and sx.bracket_separator_literal) separatorBracket(pattern, i, sx) else null;
             const interval = if (extended and c == '{' and sx.numeric_ranges) integer.read(pattern, i) catch return p.fail(.invalid_range, i) else null;
-            const group = ((sx.braces and c == '{') or interval != null) or (extended and sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null);
+            const extglob: ?FrameKind = if (extended and sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(') extglobKind(c) else null;
+            const group = ((sx.braces and c == '{') or interval != null) or extglob != null;
             const capture = if (extended and (group or c == '*' or c == '?' or (c == '[' and sx.brackets != .none and literal_bracket == null))) try p.startCapture() else null;
-            if (extended and sx.extglob and i + 1 < pattern.len and pattern[i + 1] == '(' and std.mem.findScalar(u8, "?*+@", c) != null) {
+            if (extglob) |kind| {
                 const bypass = try p.b.emit(.split, 0);
                 try p.open(i);
                 const frame = &p.b.frames[p.depth - 1];
                 frame.head = bypass;
                 frame.capture = capture;
-                frame.kind = switch (c) {
-                    '?' => .optional,
-                    '*' => .zero_more,
-                    '+' => .one_more,
-                    '@' => .one,
-                    else => unreachable,
-                };
+                frame.kind = kind;
                 i += 2;
             } else if (extended and sx.extglob and c == '|' and p.depth > 0 and p.b.frames[p.depth - 1].kind != .brace) {
                 try p.alternative();
@@ -515,4 +510,18 @@ fn pairedBraces(text: []const u8, sx: syntax.Syntax) bool {
         }
     }
     return depth == 0;
+}
+
+const FrameKind = @FieldType(program.Frame, "kind");
+
+/// The group an extglob operator opens before its `(`, or null for a byte
+/// that opens none.
+fn extglobKind(c: u8) ?FrameKind {
+    return switch (c) {
+        '?' => .optional,
+        '*' => .zero_more,
+        '+' => .one_more,
+        '@' => .one,
+        else => null,
+    };
 }

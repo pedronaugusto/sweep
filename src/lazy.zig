@@ -441,7 +441,7 @@ const Run = struct {
         for (sim.reach) |reach| @memset(reach, 0);
         @memset(sim.kernel, 0);
         sim.low = n;
-        for (c.kernelOf(r.state)) |k| sim.kernel[k / 64] |= @as(u64, 1) << @intCast(k % 64);
+        for (c.kernelOf(r.state)) |k| sim.kernel[k / 64] |= @as(u64, 1) << @as(u6, @truncate(k));
         sim.start = c.states[r.state].start;
         r.sim = sim;
     }
