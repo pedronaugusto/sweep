@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Breaking
+
+- `Walk.OpenError` (and so `NextError`) holds `ignore.FileError`: a walk with `Options.ignore` reads each directory's ignore files and fails with what reading one did. `Matcher` gains `everything`, so an exhaustive switch over it needs that arm.
+
+### Added
+
+- `ignore`: ignore files stacked as git stacks them (`dir.c`), proven against git 2.56.0's t0008 and t3001 and fuzzed against git's own list walk.
+  - `ignore.Stack` holds levels in three `Group`s, ranked lowest first: files (`core.excludesFile`, then `info/exclude`), each directory's files, and a command line's patterns. Within a group the later level wins, and within a level the last matching line.
+  - Levels are added by `addText` (line grammar), `addPatterns` (as given, `clean -e`), `addFile`, and `addDirectory` (`Options.file_names`, read with no follow).
+  - `match` decides a path alone, and `matchPath` decides it with its parents, an excluded parent deciding. Both return `Match` with the deciding `Origin` (source, line, text, negated), check-ignore -v's line.
+  - Files are read through aegis with a stated limit (`Options.max_file`, git's 100 MiB). An in-tree file is opened without following a link, so a link is refused by the open itself.
+  - `Options.unreadable = .skip` is git's warn-and-go-on. Each file skipped is listed in `Stack.skipped` with its reason (`FileTooLarge`, `LinkRefused`, or the error).
+  - `ignore.Checker` asks one path at a time outside a walk. It reads each directory's files the first time a path below it is asked about, and nothing inside an excluded directory.
+- `Walk.Options.ignore`: a walk reads each directory's ignore files through the handle it holds, pushes them as it enters and pops them as it leaves, and neither returns nor enters an excluded entry. `Matcher.everything` walks every path the stack lets through.
+
 ## [0.3.0] - 2026-10-27
 
 ### Breaking

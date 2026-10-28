@@ -54,11 +54,17 @@ pub const entries: []const []const u8 = &.{};
 pub const modules: []const gantry.NamedModule = &.{};
 
 const package_references = [_]gantry.rules.ReferenceRule{
-    .{ .name = "named dependencies", .unresolved_only = true, .except_targets = &.{
-        "std",
-        "aegis",
-        "shakedown",
-    } },
+    .{
+        .name = "named dependencies",
+        .unresolved_only = true,
+        .except_targets = &.{
+            "std",
+            "aegis",
+            "shakedown",
+            // The target, for a test that says what a platform does not do.
+            "builtin",
+        },
+    },
     .{ .name = "source siblings", .suffix = ".zig", .relative = true, .except_targets = &.{"src/**"} },
 };
 

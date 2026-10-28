@@ -1,6 +1,6 @@
 //! The line grammar of `.gitignore` and `info/exclude` files: comments,
 //! negation, trailing spaces, a leading `/` and a trailing `/`. Files,
-//! levels, precedence and `core.excludesFile` are the caller's.
+//! levels and precedence are `ignore.zig`'s.
 const std = @import("std");
 const set = @import("set.zig");
 

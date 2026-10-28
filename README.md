@@ -260,11 +260,14 @@ and directory symlinks are not followed. `follow_symlinks` checks ancestor cycle
 `hidden = false` excludes hidden entries, `files_only` excludes directories, and
 `order = .lexical` materializes and sorts matches globally. The default order is
 filesystem traversal order. Paths are relative to the supplied directory. Set
-expansion returns the union of matches; ignore-file precedence stays with callers.
+expansion returns the union of matches. `Options.ignore` narrows a walk by ignore
+files stacked as git stacks them (`sweep.ignore`).
 
 ## Scope
-- No reading of ignore or attribute files: `gitignore.parseLine` reads one line, and
-  files, levels and precedence are the caller's.
+- Ignore files are read and stacked as git does (`sweep.ignore`: `Stack`,
+  `Checker`, `Walk.Options.ignore`); attribute files are not read. Finding a
+  repository, and the files above a walk's root, are the caller's: add them as
+  levels.
 - Canonical NFC is optional; no compatibility normalization or full case-fold
   expansion.
 - Native Windows matching accepts `.alternate_separator = '\\'` with

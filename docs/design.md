@@ -4,8 +4,9 @@ sweep owns glob syntax and matching. Its runtime closure is sweep → aegis → 
 Matching,
 captures and Unicode transforms are pure computation; filesystem expansion is
 an optional layer above them that accepts the caller's `std.Io` per call.
-Ignore-file precedence, filesystem identity, root case policy and locale rules
-belong to callers. Callers choose equivalence options; sweep applies them after
+git's ignore-file precedence is sweep's (`ignore`, an optional layer
+reading files through the caller's `std.Io`); filesystem identity, root case
+policy and locale rules belong to callers. Callers choose equivalence options; sweep applies them after
 parsing syntax, because rewriting glob text can change its language.
 
 This describes the implementation in this repository. Change it with the code
@@ -38,7 +39,8 @@ level by [ci/layers.zig](../ci/layers.zig), not by module boundaries.
 | One-shot, DFA states, hashed and scanned literals | `match.zig` owns one-shot stack scratch; `capture.zig` owns tagged execution; `dfa.zig` builds unit partitions and states; `tables.zig` owns literal indexes; `scan.zig` owns the entry list a small reading is asked one by one. |
 | Compiled patterns and lazy DFAs | `pattern.zig` owns a compiled Pattern; `lazy.zig` owns set automata and their mutable DFA caches. |
 | Sets | `set.zig` owns entry order, immutable partitions and query aggregation. |
-| Line grammar | `gitignore.zig` parses a borrowed line; files, levels and precedence stay outside sweep. |
+| Line grammar | `gitignore.zig` parses a borrowed line. |
+| Ignore stacks | `ignore.zig` stacks files as git's `dir.c` does: one `Set` and cache per level, ranked by group (files, directories, command line) and then by the order added, an excluded parent deciding. It reads files through aegis with a stated limit, and an in-tree file with no follow. |
 | Walking | `walk.zig` owns traversal state above Pattern/Set pruning. |
 | Concern facades | `glob.zig` exposes pure computation as the namespace `sweep.glob`; `walk.zig` exposes optional filesystem expansion as `sweep.walk` and imports only `glob.zig`. |
 | Public facade | `sweep.zig` is the module root: it exposes both namespaces and reexports their names at the root, without becoming their state owner. |
@@ -60,7 +62,11 @@ borrowed until the next call or teardown; `expand` returns owned paths instead.
 Walking uses the literal base and `leadsTo` for pruning, supports filesystem or
 lexical order, and checks resolved ancestor paths for directory-symlink cycles
 when following links. I/O failures propagate except explicitly skipped missing
-entries and link loops. Walking does not implement ignore-file precedence.
+entries and link loops. With `Options.ignore` a walk reads each directory's
+ignore files through the handle it holds, pushes them as it enters and pops them
+as it leaves, and neither returns nor enters an excluded entry; a pattern's
+invariant base still has its ancestors' files read, and an excluded base yields
+nothing.
 
 ## Matching and bounds
 
