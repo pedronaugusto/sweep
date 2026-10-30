@@ -57,7 +57,7 @@ fn decode(utf8: bool, bytes: []const u8, at: usize) struct { code: Code, len: us
     if (len > bytes.len - at) return .{ .code = ill_formed + first, .len = 1 };
     if (!std.unicode.utf8ValidateSlice(bytes[at..][0..len])) return .{ .code = ill_formed + first, .len = 1 };
     var scalar: Code = first & (@as(u8, 0x7f) >> len);
-    for (bytes[at + 1 ..][0 .. len - 1]) |b| scalar = scalar << 6 | (b & 0x3f);
+    for (bytes[at + 1 ..][0 .. len - 1]) |b| scalar = (scalar << 6) | (b & 0x3f);
     return .{ .code = scalar, .len = len };
 }
 

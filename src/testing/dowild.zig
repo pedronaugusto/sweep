@@ -260,7 +260,7 @@ fn matchClass(name: []const u8, text_byte: u8, options: Options) Error!bool {
     if (std.mem.eql(u8, name, "punct")) return c > 0x20 and c < 0x7f and !isAlpha(c) and !isDigit(c);
     if (std.mem.eql(u8, name, "space")) return c == ' ' or (c >= '\t' and c <= '\r');
     if (std.mem.eql(u8, name, "upper")) return isUpper(c) or (options.case_fold and isLower(c));
-    if (std.mem.eql(u8, name, "xdigit")) return isDigit(c) or (c | 0x20) >= 'a' and (c | 0x20) <= 'f';
+    if (std.mem.eql(u8, name, "xdigit")) return isDigit(c) or ((c | 0x20) >= 'a' and (c | 0x20) <= 'f');
     return error.InvalidPattern;
 }
 

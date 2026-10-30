@@ -41,7 +41,7 @@ pub const Class = struct {
     }
 
     pub fn hasLow(class: *const Class, byte: u8) bool {
-        return class.low[byte >> 6] >> @as(u6, @truncate(byte)) & 1 != 0;
+        return (class.low[byte >> 6] >> @as(u6, @truncate(byte))) & 1 != 0;
     }
 
     pub fn setLow(class: *Class, byte: u8) void {

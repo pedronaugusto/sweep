@@ -506,11 +506,11 @@ const Needles = struct {
         if (bytes.len >= 4) {
             const low = std.mem.readInt(u32, bytes[0..4], .little);
             const high = std.mem.readInt(u32, bytes[bytes.len - 4 ..][0..4], .little);
-            return n.inWord(@as(u64, high) << 32 | low);
+            return n.inWord((@as(u64, high) << 32) | low);
         }
         // Zero bytes pad the word: no needle is zero.
         var word: u64 = 0;
-        for (bytes) |b| word = word << 8 | b;
+        for (bytes) |b| word = (word << 8) | b;
         return n.inWord(word);
     }
 
@@ -696,7 +696,7 @@ const Slashes = struct {
         var i = subject.len;
         while (i > at) {
             i -= 1;
-            word = word << 8 | subject[i];
+            word = (word << 8) | subject[i];
         }
         return word;
     }

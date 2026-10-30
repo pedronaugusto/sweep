@@ -1,6 +1,7 @@
 //! Memory: every allocation failure is survived without a leak, and no
 //! query allocates.
 const std = @import("std");
+const aegis = @import("aegis");
 const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 const NoResize = @import("shakedown").alloc.NoResize;
@@ -84,7 +85,7 @@ test "Set queries allocate nothing after Cache.init" {
     // The smallest cache, so queries clear it and fall back to the NFA too.
     var cache: Set.Cache = try .init(gpa, &set, .{ .capacity = .fromRaw(0) });
     defer cache.deinit();
-    var out: std.ArrayList(Set.Index) = try .initCapacity(gpa, @as(usize, set.len().raw()) * subjects.len);
+    var out: std.ArrayList(Set.Index) = try .initCapacity(gpa, (try aegis.int.Checked(usize).init(set.len().raw()).mul(subjects.len)).raw());
     defer out.deinit(gpa);
     const before = failing.allocations;
     for (0..50) |_| for (subjects) |subject| {

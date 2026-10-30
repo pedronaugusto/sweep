@@ -442,13 +442,13 @@ pub const Checker = struct {
     /// then each directory's as it is read. Owned.
     stack: Stack,
     /// The tree the paths are relative to. Borrowed.
-    root: Io.Dir,
+    root: aegis.own.Lent(Io.Dir),
     /// Private: the directories read, `""` the root. Keys owned.
     read: std.StringHashMapUnmanaged(void) = .empty,
 
     /// A checker over `stack`, which it now owns, for the tree at `root`.
     pub fn init(stack: Stack, root: Io.Dir) Checker {
-        return .{ .stack = stack, .root = root };
+        return .{ .stack = stack, .root = .{ .data = root } };
     }
 
     /// Frees the stack and what was read into it.
@@ -488,8 +488,8 @@ pub const Checker = struct {
     }
 
     fn readDirectory(c: *Checker, io: Io, dir: []const u8) FileError!void {
-        if (dir.len == 0) return c.stack.addDirectory(io, c.root, "");
-        var opened = c.root.openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (err) {
+        if (dir.len == 0) return c.stack.addDirectory(io, c.root.get(), "");
+        var opened = c.root.get().openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (err) {
             // A path the tree does not hold has no files above it to read.
             error.FileNotFound, error.NotDir => return,
             else => |e| return c.stack.unreadable(dir, e),

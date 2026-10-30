@@ -33,7 +33,7 @@ const Context = struct {
                 defer builder.deinit();
                 for (entries) |text| _ = try builder.add(text, .{ .options = options });
                 var set = try builder.build();
-                hits += set.len().raw();
+                std.mem.doNotOptimizeAway(set.len());
                 set.deinit();
             },
             .cache_init => {

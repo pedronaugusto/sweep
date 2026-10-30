@@ -294,13 +294,13 @@ fn cyclicLiveness(gpa: Allocator, p: Program) Allocator.Error![]u2 {
         }
     }
     const out = try gpa.alloc(u2, n);
-    for (out, 0..) |*bits, t| bits.* = @as(u2, @intFromBool(reached[Graph.kernel(t, false)])) | @as(u2, @intFromBool(reached[Graph.kernel(t, true)])) << 1;
+    for (out, 0..) |*bits, t| bits.* = @as(u2, @intFromBool(reached[Graph.kernel(t, false)])) | (@as(u2, @intFromBool(reached[Graph.kernel(t, true)])) << 1);
     return out;
 }
 
 fn bitOf(set: u6, context: program_mod.Context, start: bool) bool {
     const shift: u3 = @intCast(@as(u3, @backingInt(context)) * 2 + @intFromBool(start));
-    return set >> shift & 1 != 0;
+    return (set >> shift) & 1 != 0;
 }
 
 fn enterLive(p: Program, kernel: []const u2, entered: []const u6, t: usize) u6 {
@@ -316,7 +316,7 @@ fn enterLive(p: Program, kernel: []const u2, entered: []const u6, t: usize) u6 {
 }
 
 fn kernelBit(kernel: []const u2, k: usize, start: bool) bool {
-    return kernel[k] >> @intFromBool(start) & 1 != 0;
+    return (kernel[k] >> @intFromBool(start)) & 1 != 0;
 }
 
 fn enterOne(p: Program, kernel: []const u2, entered: []const u6, t: usize, context: program_mod.Context, start: bool) bool {
@@ -368,7 +368,7 @@ fn kernelLive(p: Program, entered: []const u6, k: usize) u2 {
                     live[s] = any;
                 }
             }
-            out = @as(u2, @intFromBool(live[0])) | @as(u2, @intFromBool(live[1])) << 1;
+            out = @as(u2, @intFromBool(live[0])) | (@as(u2, @intFromBool(live[1])) << 1);
         },
         .lit, .dot, .dot_plain, .any, .class, .sep => {
             const next: usize = if (node.op == .dot) k + 2 else k + 1;

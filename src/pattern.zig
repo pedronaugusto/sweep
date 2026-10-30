@@ -332,7 +332,7 @@ pub const Eager = struct {
     }
 
     pub fn accepts(e: *const Eager, state: u8) bool {
-        return e.accepting >> @intCast(state) & 1 != 0;
+        return (e.accepting >> @intCast(state)) & 1 != 0;
     }
 
     pub fn matches(e: *const Eager, subject: []const u8, reading: program_mod.Reading) bool {

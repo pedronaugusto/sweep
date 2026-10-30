@@ -207,7 +207,7 @@ pub const Cache = struct {
         std.debug.assert(std.mem.isAligned(at.*, line));
         const bytes = memory[at.*..][0 .. len * @sizeOf(T)];
         at.* = std.mem.alignForward(usize, at.* + bytes.len, line);
-        // aegis: internal: `memory` is declared line-aligned and the part starts on a line (both asserted above), which aligns a `T`
+        // aegis: internal(A019): `memory` is declared line-aligned and the part starts on a line (both asserted above), which aligns a `T`
         const part: []align(line) u8 = @alignCast(bytes);
         return std.mem.bytesAsSlice(T, part);
     }

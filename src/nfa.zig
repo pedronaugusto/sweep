@@ -128,7 +128,7 @@ pub const Sim = struct {
 
     /// Whether node `k` is in the kernel.
     pub fn has(sim: *const Sim, k: usize) bool {
-        return sim.kernel[k / 64] >> @as(u6, @truncate(k)) & 1 != 0;
+        return (sim.kernel[k / 64] >> @as(u6, @truncate(k))) & 1 != 0;
     }
 
     /// The kernel's nodes in ascending order.
@@ -160,7 +160,7 @@ pub const Sim = struct {
     };
 
     fn mark(sim: *Sim, comptime cyclic: bool, context: Context, k: usize) void {
-        if (cyclic and sim.seen[@backingInt(context)][k / 64] >> @as(u6, @truncate(k)) & 1 != 0) return;
+        if (cyclic and (sim.seen[@backingInt(context)][k / 64] >> @as(u6, @truncate(k))) & 1 != 0) return;
         const w = k / 64;
         sim.reach[@backingInt(context)][w] |= @as(u64, 1) << @as(u6, @truncate(k));
         if (w < sim.low) sim.low = w;
