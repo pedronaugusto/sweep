@@ -21,6 +21,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `ignore.Checker` asks one path at a time outside a walk. It reads each directory's files the first time a path below it is asked about, and nothing inside an excluded directory.
 - `Walk.Options.ignore`: a walk reads each directory's ignore files through the handle it holds, pushes them as it enters and pops them as it leaves, and neither returns nor enters an excluded entry. `Matcher.everything` walks every path the stack lets through.
 
+### Changed
+
+- aegis 0.3, which has one way to lend: `ignore.Checker` holds the caller's root as the `std.Io.Dir` itself, lent by value, which it never closes. Pins aegis breaking-0.3 (7bdb587) and shakedown on it.
+
 ## [0.3.0] - 2026-10-27
 
 ### Breaking
