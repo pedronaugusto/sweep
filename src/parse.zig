@@ -195,9 +195,11 @@ const Parser = struct {
         }
         p.at = pattern.len;
         if (p.depth > 0) return p.fail(if (p.b.frames[p.depth - 1].kind == .brace) .unclosed_brace else .unclosed_extglob, p.b.frames[p.depth - 1].offset.raw());
-        // The index is within 27 bits, so the directory bit packs beside it.
+        // The index is within 27 bits, so the directory bit packs beside it,
+        // in the low bit the shift leaves clear.
         const shifted = aegis.int.Checked(u32).init(entry.index.raw()).shl(1) catch return error.Full;
-        _ = try p.b.emit(.accept, aegis.int.cast(u28, shifted.raw() | @intFromBool(entry.dir_only)) catch return error.Full);
+        const packed_index = shifted.add(@intFromBool(entry.dir_only)) catch return error.Full;
+        _ = try p.b.emit(.accept, aegis.int.cast(u28, packed_index.raw()) catch return error.Full);
     }
 
     fn startCapture(p: *Parser) RunError!?u32 {
