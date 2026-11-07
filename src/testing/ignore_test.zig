@@ -550,3 +550,20 @@ test "every allocation a stack makes can fail, and leaves it as it was" {
         }
     }.exercise, .{});
 }
+
+test "an origin's text is the line as git check-ignore -v names it: no CR, no trailing spaces it trims" {
+    var s: ignore.Stack = .init(gpa, .{});
+    defer s.deinit();
+    // git 2.56's answers for this file: `x.o`, `y.o`, `a\ `, `z.o`.
+    try s.addText("x.o  \ny.o\r\na\\ \nz.o \r\n", .{ .group = .directory, .source = ".gitignore" });
+    for ([_]struct { []const u8, []const u8 }{
+        .{ "x.o", "x.o" },
+        .{ "y.o", "y.o" },
+        .{ "a ", "a\\ " },
+        .{ "z.o", "z.o" },
+    }) |case| {
+        const m = s.match(case[0], .file);
+        try std.testing.expect(m.excluded);
+        try std.testing.expectEqualStrings(case[1], m.by.?.text);
+    }
+}

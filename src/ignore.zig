@@ -35,7 +35,8 @@ pub const Origin = struct {
     /// One-based: the line in its file, or the pattern's place among those
     /// given.
     line: u32,
-    /// The line as written, without its line feed. Borrowed from the stack.
+    /// The line as `git check-ignore -v` names it: without its line feed or
+    /// CR, and without the trailing spaces git trims. Borrowed from the stack.
     text: []const u8,
     /// A `!` line: its match re-includes.
     negated: bool,
@@ -326,7 +327,8 @@ pub const Stack = struct {
                 // Every entry here takes git's slash.
                 error.SeparatorMismatch => unreachable,
             };
-            const written = if (pieces == .lines and raw.len > 0 and raw[raw.len - 1] == '\r') raw[0 .. raw.len - 1] else raw;
+            // As git names the line: without its CR and the spaces it trims.
+            const written = if (pieces == .lines) gitignore.trimTrailingSpaces(if (raw.len > 0 and raw[raw.len - 1] == '\r') raw[0 .. raw.len - 1] else raw) else raw;
             try origins.append(s.gpa, .{ .source = "", .line = number, .text = written, .negated = line.negated });
         }
         if (origins.items.len == 0) return;

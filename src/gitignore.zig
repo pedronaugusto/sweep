@@ -51,7 +51,7 @@ pub fn parsePattern(text_in: []const u8) ?Line {
 
 /// git's `trim_trailing_spaces`: spaces go unless a backslash escapes the
 /// last one; a line ending in a lone backslash keeps everything.
-fn trimTrailingSpaces(line: []const u8) []const u8 {
+pub fn trimTrailingSpaces(line: []const u8) []const u8 {
     var last_space: ?usize = null;
     var i: usize = 0;
     while (i < line.len) : (i += 1) switch (line[i]) {
