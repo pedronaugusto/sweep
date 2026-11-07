@@ -7,6 +7,8 @@
 //! - small: sets of 1 to 64 entries, the size of one ignore or attributes file,
 //!   loaded (build and cache) and queried warm;
 //! - adversarial: the shapes that make backtrackers exponential.
+//! - stack: a generated tree walked with nested ignore files on `ignore.Stack`,
+//!   against the same walk with none.
 //!
 //! Timings are wall-clock on this machine; CI only compiles this file.
 const std = @import("std");
@@ -71,6 +73,7 @@ fn workloads(r: Report, gpa: Allocator, a: Allocator, selected: []const []const 
         try longRepeated(r, gpa, a, smoke);
     }
     if (wanted(selected, "features")) try features(r, gpa, smoke);
+    if (wanted(selected, "stack")) try stacked(r, gpa, smoke);
 }
 
 /// Whether `workload` was asked for; no names means all of them.
@@ -349,6 +352,84 @@ fn walking(r: Report, gpa: Allocator, smoke: bool) !void {
         if (paths.items().len != count / 2) return error.MissingPaths;
     }
     try r.line("features", "walk 1000 files (half pruned)", "expand", best / 1e6, "ms");
+}
+
+/// A tree of `width` directories per level, `depth` levels down and `files` a
+/// directory, written under `root`: a `.gitignore` in every directory, of
+/// lines that exclude some of what is below it.
+fn stackTree(io: std.Io, gpa: Allocator, root: std.Io.Dir, base: []const u8, width: usize, depth: usize, files: usize) (std.Io.Dir.WriteFileError || std.Io.Dir.CreateDirPathError || Allocator.Error)!void {
+    const ignore = try gpa.print("{s}{s}.gitignore", .{ base, if (base.len == 0) "" else "/" });
+    defer gpa.free(ignore);
+    try root.writeFile(io, .{ .sub_path = ignore, .data = "*.o\n*.log\n!keep.log\nbuild/\n/tmp*\n" });
+    for (0..files) |i| {
+        const name = try gpa.print("{s}{s}f{d}{s}", .{ base, if (base.len == 0) "" else "/", i, switch (i % 4) {
+            0 => ".o",
+            1 => ".log",
+            else => ".c",
+        } });
+        defer gpa.free(name);
+        try root.writeFile(io, .{ .sub_path = name, .data = "" });
+    }
+    if (depth == 0) return;
+    for (0..width) |i| {
+        const child = try gpa.print("{s}{s}{s}{d}", .{ base, if (base.len == 0) "" else "/", if (i == 0) "build" else "d", i });
+        defer gpa.free(child);
+        try root.createDirPath(io, child);
+        try stackTree(io, gpa, root, child, width, depth - 1, files);
+    }
+}
+
+/// What a walk of `base` visits, entering each directory the stack does not
+/// exclude, with its ignore files on the stack while it is in it.
+fn stackWalk(io: std.Io, gpa: Allocator, root: std.Io.Dir, base: []const u8, stack: ?*sweep.ignore.Stack) !usize {
+    const mark = if (stack) |s| s.mark() else undefined;
+    defer if (stack) |s| s.popTo(mark);
+    var dir = try root.openDir(io, if (base.len == 0) "." else base, .{ .iterate = true });
+    defer dir.close(io);
+    if (stack) |s| try s.addDirectory(io, dir, base);
+    var visited: usize = 0;
+    var entries = dir.iterate();
+    while (try entries.next(io)) |entry| {
+        const path = try gpa.print("{s}{s}{s}", .{ base, if (base.len == 0) "" else "/", entry.name });
+        defer gpa.free(path);
+        const directory = entry.kind == .directory;
+        if (stack) |s| if (s.match(path, if (directory) .dir else .file).excluded) continue;
+        visited += 1;
+        if (directory) visited += try stackWalk(io, gpa, root, path, stack);
+    }
+    return visited;
+}
+
+/// The design's row: a walk of a generated tree with a stack against a walk
+/// with none.
+fn stacked(r: Report, gpa: Allocator, smoke: bool) !void {
+    const io = r.io;
+    const root_path = ".zig-cache/sweep-bench-stack";
+    try std.Io.Dir.cwd().deleteTree(io, root_path);
+    try std.Io.Dir.cwd().createDirPath(io, root_path);
+    // A leftover is scratch the next run deletes first, so it is only reported.
+    defer std.Io.Dir.cwd().deleteTree(io, root_path) catch |err| std.debug.print("bench scratch left at {s}: {t}\n", .{ root_path, err });
+    const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
+    defer root.close(io);
+    try stackTree(io, gpa, root, "", 4, if (smoke) 2 else 4, 8);
+    const runs: usize = if (smoke) 1 else 7;
+    var best_none: f64 = std.math.inf(f64);
+    var best_stack: f64 = std.math.inf(f64);
+    var all: usize = 0;
+    var kept: usize = 0;
+    for (0..runs) |_| {
+        const t = r.now();
+        all = try stackWalk(io, gpa, root, "", null);
+        best_none = @min(best_none, nsBetween(t, r.now()));
+        var stack: sweep.ignore.Stack = .init(gpa, .{});
+        defer stack.deinit();
+        const u = r.now();
+        kept = try stackWalk(io, gpa, root, "", &stack);
+        best_stack = @min(best_stack, nsBetween(u, r.now()));
+    }
+    if (kept == 0 or kept >= all) return error.MissingPaths;
+    try r.line("stack", "walk, no stack", "walk", best_none / 1e6, "ms");
+    try r.line("stack", "walk, nested .gitignore", "walk", best_stack / 1e6, "ms");
 }
 
 /// Sets of a handful to a few dozen entries, the size of one ignore or
