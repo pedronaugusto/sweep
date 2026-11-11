@@ -22,6 +22,12 @@ and Unicode transforms) and `sweep.walk` (filesystem expansion); the common
 names are also at the root. A program that only matches never compiles the walk.
 See [the design](docs/design.md) for ownership, layers and matching bounds.
 
+## Stability
+
+sweep is 0.x and tracks Zig 0.17.x. A breaking change comes only in a minor release
+(0.3 to 0.4), with a CHANGELOG entry saying what changed and what to write instead; a
+patch release never breaks.
+
 ## Usage
 
 `match` answers one question with no allocation:
