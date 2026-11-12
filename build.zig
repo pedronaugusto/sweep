@@ -85,7 +85,7 @@ pub fn dev(b: *std.Build, tools: type) void {
         .hardened = .{ .fuzz_step = "test", .tsan_step = "test" },
         .bench = .{
             .programs = &.{ .{ .name = "bench", .source = "bench/main.zig" }, .{ .name = "normalization", .source = "bench/normalization.zig" }, .{ .name = "adoption", .source = "bench/adoption.zig" } },
-            .imports = benchImports,
+            .imports = tools.preflight.Bench.importsFrom(benchImports),
             .target = target,
             .optimize = optimize,
         },
