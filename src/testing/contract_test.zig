@@ -111,7 +111,8 @@ fn everything(gpa: std.mem.Allocator, io: std.Io, dir: std.Io.Dir, into: *std.Ar
         defer sub.close(io);
         var it = sub.iterate();
         while (try it.next(io)) |entry| {
-            const path = if (prefix.len == 0) try gpa.dupe(u8, entry.name) else try std.fs.path.join(gpa, &.{ prefix, entry.name });
+            // `/` on every platform, as a walk writes its paths.
+            const path = if (prefix.len == 0) try gpa.dupe(u8, entry.name) else try std.mem.concat(gpa, u8, &.{ prefix, "/", entry.name });
             errdefer gpa.free(path);
             if (entry.kind == .directory) try pending.append(gpa, try gpa.dupe(u8, path));
             try into.append(gpa, path);
