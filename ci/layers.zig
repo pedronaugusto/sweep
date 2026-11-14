@@ -41,6 +41,7 @@ pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "line grammar", .patterns = &.{
         "src/gitignore.zig",
     } },
+    .{ .name = "input", .patterns = &.{"src/input.zig"} },
     .{ .name = "ignore stacks", .patterns = &.{"src/ignore.zig"} },
     .{ .name = "glob facade", .patterns = &.{"src/glob.zig"} },
     .{ .name = "walking", .patterns = &.{"src/walk.zig"} },
@@ -93,6 +94,7 @@ pub const required = [_][]const u8{
     "src/lazy.zig",
     "src/set.zig",
     "src/gitignore.zig",
+    "src/input.zig",
     "src/glob.zig",
     "src/sweep.zig",
     "src/tests.zig",

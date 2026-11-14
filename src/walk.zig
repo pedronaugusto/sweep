@@ -299,4 +299,5 @@ pub fn expand(gpa: Allocator, io: Io, dir: Io.Dir, matcher: Matcher, options: Wa
 
 test {
     _ = @import("testing/walk_test.zig");
+    _ = @import("testing/contract_test.zig");
 }

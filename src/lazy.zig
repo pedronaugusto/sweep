@@ -59,9 +59,9 @@ pub const Automaton = struct {
             if (!e.reading.eql(reading) or e.hashed) continue;
             seen += 1;
             // A fork to this entry and to the next one.
-            const fork = if (seen < count) b.emit(.split, 0) catch unreachable else null; // unreachable: sized above
+            const fork = if (seen < count) b.emit(.split, 0) catch aegis.assert.never("the program was sized above for every fork") else null;
             // safe: the insertion count is below max_entries and fits the accept index.
-            const entry_index = parse.AcceptIndex.init(@intCast(index)) catch unreachable; // unreachable: max_entries is within AcceptIndex's bound
+            const entry_index = parse.AcceptIndex.init(@intCast(index)) catch aegis.assert.never("max_entries is within AcceptIndex's bound");
             parse.parse(&b, e.pattern, e.entry.options, .{ .index = entry_index, .dir_only = e.entry.dir_only }) catch |err| switch (err) {
                 error.PatternTooLong => return error.PatternTooLong,
                 error.InvalidPattern => unreachable, // unreachable: immutable source parsed successfully when added
@@ -126,6 +126,16 @@ pub const Stats = struct {
 /// The size of a cache line, at least: where each array of a cache starts.
 const line = 64;
 
+/// The cache's tables in its one allocation, each starting on a cache
+/// line of its own.
+const Memory = aegis.parts.Block(struct {
+    scratch: []align(line) u64,
+    states: []align(line) State,
+    arena: []align(line) u32,
+    slots: []align(line) u32,
+    buf: []align(line) u32,
+});
+
 const unknown = std.math.maxInt(u32);
 const dead: u32 = 0;
 
@@ -187,29 +197,17 @@ pub const Cache = struct {
         // Room for a few of the largest possible states, whatever the
         // capacity says.
         const arena_words = @max((budget -| fixed) / 4, 4 * (2 * nodes + class_count) + 64);
-        const total = (aegis.int.Checked(usize).init(line * 5).add(scratch_words * @sizeOf(u64) + max_states * @sizeOf(State) + (arena_words + slot_count + nodes) * 4) catch return error.OutOfMemory).raw();
-        c.memory = try gpa.alignedAlloc(u8, .fromByteUnits(line), total);
-        var at: usize = 0;
-        c.scratch = carve(u64, c.memory, &at, scratch_words);
-        c.states = carve(State, c.memory, &at, max_states);
-        c.arena = carve(u32, c.memory, &at, arena_words);
-        c.slots = carve(u32, c.memory, &at, slot_count);
-        c.buf = carve(u32, c.memory, &at, nodes);
+        const block = try Memory.plan(.{ .scratch = scratch_words, .states = max_states, .arena = arena_words, .slots = slot_count, .buf = nodes }).alloc(gpa);
+        c.memory = block.bytes();
+        const tables = block.parts();
+        c.scratch = tables.scratch;
+        c.states = tables.states;
+        c.arena = tables.arena;
+        c.slots = tables.slots;
+        c.buf = tables.buf;
         c.clear();
         c.stats.clears = 0;
         return c;
-    }
-
-    /// The next `len` elements of `memory`, from `at`, which advances to
-    /// the line after them: each array starts on a cache line of its own.
-    fn carve(comptime T: type, memory: []align(line) u8, at: *usize, len: usize) []T {
-        comptime std.debug.assert(line >= @alignOf(T));
-        std.debug.assert(std.mem.isAligned(at.*, line));
-        const bytes = memory[at.*..][0 .. len * @sizeOf(T)];
-        at.* = std.mem.alignForward(usize, at.* + bytes.len, line);
-        // `memory` is declared line-aligned and the part starts on a line (both asserted above), which aligns a `T`
-        const part: []align(line) u8 = @alignCast(bytes);
-        return std.mem.bytesAsSlice(T, part);
     }
 
     /// Bytes that `a`'s states can use. The states a set reaches grow with
@@ -293,8 +291,8 @@ pub const Cache = struct {
             // arena for any state beside the dead one.
             c.clear();
             slot = @intCast(hash & mask);
-            std.debug.assert(c.state_len < c.states.len);
-            std.debug.assert(c.used + need <= c.arena.len);
+            aegis.assert.invariant(c.state_len < c.states.len, "a state is added only below the table's capacity, checked before");
+            aegis.assert.invariant(c.used + need <= c.arena.len, "a state's bytes fit the arena, checked before");
         }
         const at = c.alloc(need).?;
         @memcpy(c.arena[at..][0..kernel.len], kernel);
@@ -425,7 +423,7 @@ const Run = struct {
     /// at most (units + 1) × states steps.
     fn checkBound(r: *const Run) void {
         const after = if (r.sim) |sim| sim.steps else 0;
-        std.debug.assert(r.steps + after <= (r.units + 1) * r.automaton.program().states());
+        aegis.assert.invariant(r.steps + after <= (r.units + 1) * r.automaton.program().states(), "the search takes at most a step per state per position");
     }
 
     fn fallBack(r: *Run) void {

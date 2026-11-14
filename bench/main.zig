@@ -408,7 +408,7 @@ fn stacked(r: Report, gpa: Allocator, smoke: bool) !void {
     try std.Io.Dir.cwd().deleteTree(io, root_path);
     try std.Io.Dir.cwd().createDirPath(io, root_path);
     // A leftover is scratch the next run deletes first, so it is only reported.
-    defer std.Io.Dir.cwd().deleteTree(io, root_path) catch |err| std.debug.print("bench scratch left at {s}: {t}\n", .{ root_path, err });
+    defer std.Io.Dir.cwd().deleteTree(io, root_path) catch |err| std.log.warn("bench scratch left at {s}: {t}", .{ root_path, err });
     const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
     defer root.close(io);
     try stackTree(io, gpa, root, "", 4, if (smoke) 2 else 4, 8);

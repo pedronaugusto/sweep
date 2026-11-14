@@ -1,0 +1,11 @@
+{
+  "seams": [
+    {
+      "file": "src/input.zig",
+      "rules": [
+        "A009"
+      ],
+      "reason": "sweep's input seam: the ignore files read from the caller's tree (git's .gitignore, info/exclude, core.excludesFile), each held to Options.max_file and opened through a link or not as git does; every other part of sweep reads the bytes it hands back"
+    }
+  ]
+}

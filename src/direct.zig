@@ -459,7 +459,7 @@ const Needles = struct {
     /// The roles whose bytes are needles, three bits in a row.
     const checked = Role.bracket | Role.escape | Role.brace;
     comptime {
-        std.debug.assert(checked == 0b111 << 3);
+        if (checked != 0b111 << 3) @compileError("the checked bits are the three above the low three");
     }
 
     const by_roles: [8]?Needles = table: {

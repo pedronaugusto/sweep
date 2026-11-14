@@ -20,7 +20,7 @@ pub const AcceptIndex = aegis.int.Ranged(u32, 0, (1 << 27) - 1);
 
 /// What the accept node of a parsed pattern reports.
 pub const Entry = struct {
-    index: AcceptIndex = AcceptIndex.init(0) catch unreachable, // unreachable: zero is within the declared encoding range
+    index: AcceptIndex = .literal(0),
     dir_only: bool = false,
 };
 

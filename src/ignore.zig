@@ -8,6 +8,7 @@
 //! its contents (`dir/*`) is not excluded, and is entered.
 const std = @import("std");
 const aegis = @import("aegis");
+const input = @import("input.zig");
 const set_mod = @import("set.zig");
 const syntax = @import("syntax.zig");
 const gitignore = @import("gitignore.zig");
@@ -51,14 +52,7 @@ pub const Match = struct {
 };
 
 /// Whether a file's own name may be a symbolic link.
-pub const Links = enum {
-    /// Read through a link: git follows `core.excludesFile` and
-    /// `info/exclude`.
-    follow,
-    /// A link is `error.LinkRefused`: git's `PATTERN_NOFOLLOW` for a file in
-    /// the working tree.
-    refuse,
-};
+pub const Links = input.Links;
 
 /// What a file that is there but cannot be read does.
 pub const Unreadable = enum {
@@ -70,13 +64,7 @@ pub const Unreadable = enum {
 };
 
 /// Reading a file failed.
-pub const ReadError = aegis.own.ReadFileError || aegis.own.ReadOpenedError || Io.Dir.OpenError || error{
-    /// The file holds more than `Options.max_file` bytes; git skips one
-    /// over its 100 MiB.
-    FileTooLarge,
-    /// The file's name is a symbolic link where `Links.refuse` was asked.
-    LinkRefused,
-};
+pub const ReadError = input.ReadError;
 
 /// A pattern could not join a level.
 pub const AddError = Allocator.Error || error{
@@ -249,25 +237,7 @@ pub const Stack = struct {
     }
 
     fn read(s: *Stack, io: Io, dir: Io.Dir, path: []const u8, links: Links) ReadError!?[]u8 {
-        const bytes = switch (links) {
-            .follow => aegis.own.readFile(io, dir, path, s.gpa, s.options.max_file),
-            .refuse => opened: {
-                // The open itself refuses a link (`O_NOFOLLOW`, git's
-                // `open_nofollow`): nothing is looked at before it.
-                const file = dir.openFile(io, path, .{ .follow_symlinks = false }) catch |err| switch (err) {
-                    error.FileNotFound => return null,
-                    error.SymLinkLoop => return error.LinkRefused,
-                    else => |e| return e,
-                };
-                defer file.close(io);
-                break :opened aegis.own.readOpened(io, file, s.gpa, s.options.max_file);
-            },
-        };
-        return bytes catch |err| switch (err) {
-            error.FileNotFound => null,
-            error.StreamTooLong => error.FileTooLarge,
-            else => |e| e,
-        };
+        return input.file(io, dir, path, s.gpa, s.options.max_file, links);
     }
 
     /// How a level's text divides: a file's lines, or patterns given whole,
@@ -443,14 +413,14 @@ pub const Checker = struct {
     /// The levels: the caller's first (the `file` group, any command line),
     /// then each directory's as it is read. Owned.
     stack: Stack,
-    /// The tree the paths are relative to. Borrowed.
-    root: Io.Dir,
+    /// The tree the paths are relative to: the caller's, which it closes.
+    root: aegis.own.Unowned(Io.Dir),
     /// Private: the directories read, `""` the root. Keys owned.
     read: std.StringHashMapUnmanaged(void) = .empty,
 
     /// A checker over `stack`, which it now owns, for the tree at `root`.
     pub fn init(stack: Stack, root: Io.Dir) Checker {
-        return .{ .stack = stack, .root = root };
+        return .{ .stack = stack, .root = .of(root) };
     }
 
     /// Frees the stack and what was read into it.
@@ -490,8 +460,8 @@ pub const Checker = struct {
     }
 
     fn readDirectory(c: *Checker, io: Io, dir: []const u8) FileError!void {
-        if (dir.len == 0) return c.stack.addDirectory(io, c.root, "");
-        var opened = c.root.openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (err) {
+        if (dir.len == 0) return c.stack.addDirectory(io, c.root.get(), "");
+        var opened = c.root.get().openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (err) {
             // A path the tree does not hold has no files above it to read.
             error.FileNotFound, error.NotDir => return,
             else => |e| return c.stack.unreadable(dir, e),

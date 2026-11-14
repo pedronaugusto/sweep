@@ -282,8 +282,9 @@ pub const Set = struct {
         }
     };
 
-    /// One reading's cache, and where an `ancestors` pass stands in it.
-    const PartCache = struct {
+    /// One reading's cache, and where an `ancestors` pass stands in it: the
+    /// type of a cache's private `parts`.
+    pub const PartCache = struct {
         lazy: lazy.Cache,
         cursor: lazy.Cursor = undefined,
         probe: tables.Probe = .{},
@@ -481,8 +482,8 @@ pub const Accumulator = struct {
     }
 };
 
-/// The entries of one reading.
-const Part = struct {
+/// The entries of one reading: the type of a set's private `parts`.
+pub const Part = struct {
     reading: program_mod.Reading,
     strategies: tables.Strategies,
     automaton: lazy.Automaton,

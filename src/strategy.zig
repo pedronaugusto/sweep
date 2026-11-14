@@ -3,6 +3,7 @@
 //! construction, and the literal prefix and suffix every other pattern
 //! requires.
 const std = @import("std");
+const aegis = @import("aegis");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");
 
@@ -251,7 +252,7 @@ pub fn encode(gpa: Allocator, utf8: bool, code: unit.Code, out: *std.ArrayList(u
     if (!utf8 or code < 0x80) return out.append(gpa, @intCast(code));
     if (code >= unit.ill_formed) return out.append(gpa, @intCast(code - unit.ill_formed));
     var buf: [4]u8 = undefined;
-    const len = std.unicode.utf8Encode(code, &buf) catch unreachable; // unreachable: a decoded scalar encodes
+    const len = std.unicode.utf8Encode(code, &buf) catch aegis.assert.never("a decoded scalar encodes");
     try out.appendSlice(gpa, buf[0..len]);
 }
 
@@ -276,7 +277,7 @@ pub fn bytesInto(p: Program, first: usize, end: usize, buf: []u8) ?[]u8 {
         } else if (code >= unit.ill_formed) one: {
             one[0] = @intCast(code - unit.ill_formed);
             break :one 1;
-        } else std.unicode.utf8Encode(code, &one) catch unreachable; // unreachable: a decoded scalar encodes
+        } else std.unicode.utf8Encode(code, &one) catch aegis.assert.never("a decoded scalar encodes");
         if (len + n > buf.len) return null;
         @memcpy(buf[len..][0..n], one[0..n]);
         len += n;

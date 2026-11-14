@@ -29,7 +29,10 @@ pub fn compose(a: u21, b: u21) ?u21 {
     }
     return null;
 }
-const Raw = struct {
+
+/// The scalars of a text as written, before composition: the type of an
+/// iterator's private `raw`.
+pub const Raw = struct {
     bytes: []const u8,
     escaped: bool,
     at: usize = 0,

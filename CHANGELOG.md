@@ -8,10 +8,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking
 
+- `walk.Matcher` has a third case, `everything`, a walk that only an ignore stack narrows: a switch over a matcher names it.
+- `Walk.open`, `Walk.next`, `Walk.OpenError` and `Walk.NextError` (`walk.Walk.open`, `walk.Walk.next`, `walk.Walk.OpenError`, `walk.Walk.NextError`), and `expand` (`walk.expand`), fail with `ignore.FileError` too, as the entry below says.
+- `Set.Cache.parts` (`glob.Set.Cache.parts`) is a slice of the public `Set.Cache.PartCache`, and `Set.parts` of the public `set.Part`, where both types were private; `normal.Iterator.raw` is of the public `normal.Raw`.
+- `ignore.Checker.root` is an `aegis.own.Unowned(std.Io.Dir)`, the caller's directory it never closes; `ignore.Checker.init` still takes the `std.Io.Dir`.
+
 - `Walk.OpenError` (and so `NextError`) holds `ignore.FileError`: a walk with `Options.ignore` reads each directory's ignore files and fails with what reading one did. `Matcher` gains `everything`, so an exhaustive switch over it needs that arm.
 
 ### Added
 
+- Properties for the README's promises over generated patterns: a walk returns exactly the paths of the tree that match, each once; every match starts with its pattern's literal prefix and its base; captures say what `matches` says, change nothing on a nonmatch and lie in the subject. Each fails on a planted fault.
 - `ignore`: ignore files stacked as git stacks them (`dir.c`), proven against git 2.56.0's t0008 and t3001 and fuzzed against git's own list walk.
   - `ignore.Stack` holds levels in three `Group`s, ranked lowest first: files (`core.excludesFile`, then `info/exclude`), each directory's files, and a command line's patterns. Within a group the later level wins, and within a level the last matching line.
   - Levels are added by `addText` (line grammar), `addPatterns` (as given, `clean -e`), `addFile`, and `addDirectory` (`Options.file_names`, read with no follow).
@@ -23,6 +29,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Pins aegis dc3ed602, still 0.2.4; development on preflight's ci-standard 0990716 and glint 0.8, and shakedown ed5a873. The ignore files are read in one input seam (`src/input.zig`); the lazy automaton's tables are placed in its one allocation by aegis's `parts.Block`, each on a cache line, with no conversion of its own; std's asserts are aegis contracts, kept in every build.
 - Pins aegis c8982a8, still 0.2.4: six additive commits after 3c0b13e (the role declarations a linter reads, `lint_rules`), the aegis the development build's preflight selects. Nothing sweep calls changed.
 - aegis 0.3, which has one way to lend: `ignore.Checker` holds the caller's root as the `std.Io.Dir` itself, lent by value, which it never closes. Pins aegis breaking-0.3 (7bdb587) and shakedown on it.
 

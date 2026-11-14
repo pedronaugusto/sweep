@@ -2,6 +2,7 @@
 //! required prefix and suffix checked first, then a small eager DFA, with
 //! the NFA as the fallback that keeps the bound.
 const std = @import("std");
+const aegis = @import("aegis");
 const unit = @import("unit.zig");
 const syntax = @import("syntax.zig");
 const program_mod = @import("program.zig");
@@ -234,8 +235,7 @@ pub const Pattern = struct {
     /// are null. Stars are greedy, alternatives prefer the first match.
     /// No allocation occurs after captureCache. Output changes only on a match.
     pub fn captures(p: *const Pattern, cache: *CaptureCache, subject: []const u8, out: []?Capture) CaptureError!bool {
-        std.debug.assert(cache.source.ptr == p.source.ptr);
-        std.debug.assert(cache.source.len == p.source.len);
+        aegis.assert.invariant(cache.source.ptr == p.source.ptr and cache.source.len == p.source.len, "a capture cache is used with the pattern it was made for");
         return cache.matches(subject, out);
     }
 

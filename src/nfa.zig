@@ -6,7 +6,7 @@
 //! Repeated extglobs use visited contexts only when a backward edge exists,
 //! each (node, context) taken at most once per position: O(m) per unit and
 //! O(n·m) per subject, asserted in safe builds.
-const std = @import("std");
+const aegis = @import("aegis");
 const unit = @import("unit.zig");
 const program_mod = @import("program.zig");
 
@@ -249,7 +249,7 @@ pub const Sim = struct {
         sim.low = r0.len;
         // The bound the design promises: each (node, context) at most once
         // per position.
-        std.debug.assert(sim.steps <= (sim.units + 1) * p.states());
+        aegis.assert.invariant(sim.steps <= (sim.units + 1) * p.states(), "the simulation takes at most a step per state per position");
     }
 
     fn fork(sim: *Sim, comptime cyclic: bool, k: usize, target: usize, context: Context) void {

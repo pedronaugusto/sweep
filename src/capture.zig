@@ -162,7 +162,7 @@ pub const Cache = struct {
         // One spare bit says that a consuming globstar resumed its loop.
         const id = k * 3 + @as(usize, @backingInt(context));
         const slots = c.capture_count * 2;
-        std.debug.assert(c.depth < c.frames.len);
+        aegis.assert.invariant(c.depth < c.frames.len, "a capture frame is pushed only below the frames sized for the pattern");
         c.frames[c.depth] = @as(u32, @intCast(id)) | (if (loop) @as(u32, 1) << 31 else 0);
         @memcpy(c.pending[c.depth * slots ..][0..slots], history);
         c.depth += 1;
