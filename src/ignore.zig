@@ -461,7 +461,7 @@ pub const Checker = struct {
 
     fn readDirectory(c: *Checker, io: Io, dir: []const u8) FileError!void {
         if (dir.len == 0) return c.stack.addDirectory(io, c.root.get(), "");
-        var opened = c.root.get().openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (err) {
+        var opened = c.root.get().openDir(io, dir, .{ .follow_symlinks = false }) catch |err| switch (input.noFollow(io, c.root.get(), dir, false, err)) {
             // A path the tree does not hold has no files above it to read.
             error.FileNotFound, error.NotDir => return,
             else => |e| return c.stack.unreadable(dir, e),

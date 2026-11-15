@@ -4,6 +4,7 @@ const std = @import("std");
 const aegis = @import("aegis");
 const glob = @import("glob.zig");
 const ignore = @import("ignore.zig");
+const input = @import("input.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
@@ -119,7 +120,7 @@ pub const Walk = struct {
                 return walk;
             };
             const parent = walk.frames.items[walk.frames.items.len - 1].dir.borrow().*;
-            const child = parent.openDir(io, component, .{ .iterate = true, .follow_symlinks = options.follow_symlinks }) catch |err| switch (err) {
+            const child = parent.openDir(io, component, .{ .iterate = true, .follow_symlinks = options.follow_symlinks }) catch |err| switch (input.noFollow(io, parent, component, options.follow_symlinks, err)) {
                 error.FileNotFound, error.NotDir, error.SymLinkLoop => {
                     walk.clear(io);
                     return walk;
@@ -191,7 +192,7 @@ pub const Walk = struct {
             if (w.options.ignore) |stack| if (stack.match(entry.path, entry.kind).excluded) continue;
             const matched = (!directory or !w.options.files_only) and w.matcher.matches(entry.path, entry.kind);
             if (directory and w.matcher.leads(entry.path)) {
-                const child = frame.dir.borrow().openDir(io, item.name, .{ .iterate = true, .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (err) {
+                const child = frame.dir.borrow().openDir(io, item.name, .{ .iterate = true, .follow_symlinks = w.options.follow_symlinks }) catch |err| switch (input.noFollow(io, frame.dir.borrow().*, item.name, w.options.follow_symlinks, err)) {
                     error.FileNotFound, error.NotDir, error.SymLinkLoop => if (matched) return entry else continue,
                     else => return err,
                 };
