@@ -29,6 +29,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Pins aegis f52eabe, still 0.2.4 (its addition: `id.raws`), the one aegis the family builds on; development on preflight's ci-standard f991816 and shakedown 327bc61. Nothing this package calls changed.
 - Pins aegis dc3ed602, still 0.2.4; development on preflight's ci-standard 0990716 and glint 0.8, and shakedown ed5a873. The ignore files are read in one input seam (`src/input.zig`); the lazy automaton's tables are placed in its one allocation by aegis's `parts.Block`, each on a cache line, with no conversion of its own; std's asserts are aegis contracts, kept in every build.
 - Pins aegis c8982a8, still 0.2.4: six additive commits after 3c0b13e (the role declarations a linter reads, `lint_rules`), the aegis the development build's preflight selects. Nothing sweep calls changed.
 - aegis 0.3, which has one way to lend: `ignore.Checker` holds the caller's root as the `std.Io.Dir` itself, lent by value, which it never closes. Pins aegis breaking-0.3 (7bdb587) and shakedown on it.
