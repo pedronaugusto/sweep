@@ -328,30 +328,32 @@ fn walking(r: Report, gpa: Allocator, smoke: bool) !void {
     const root_path = ".zig-cache/sweep-bench-tree";
     try std.Io.Dir.cwd().deleteTree(io, root_path);
     try std.Io.Dir.cwd().createDirPath(io, root_path);
-    // glint-ignore: Z026 -- the tree is cache scratch and the next run deletes it before filling it, so a leftover is never read
-    defer std.Io.Dir.cwd().deleteTree(io, root_path) catch {};
-    const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
-    defer root.close(io);
-    const count: usize = if (smoke) 10 else 1000;
-    for (0..count) |i| {
-        const directory = try gpa.print("{s}/{d}", .{ if (i % 2 == 0) @as([]const u8, "src") else "other", i % 20 });
-        defer gpa.free(directory);
-        try root.createDirPath(io, directory);
-        const name = try gpa.print("{s}/f{d}.c", .{ directory, i });
-        defer gpa.free(name);
-        try root.writeFile(io, .{ .sub_path = name, .data = "" });
+    // A run that fails in the block leaves the tree, which the next run deletes before filling it.
+    {
+        const root = try std.Io.Dir.cwd().openDir(io, root_path, .{ .iterate = true });
+        defer root.close(io);
+        const count: usize = if (smoke) 10 else 1000;
+        for (0..count) |i| {
+            const directory = try gpa.print("{s}/{d}", .{ if (i % 2 == 0) @as([]const u8, "src") else "other", i % 20 });
+            defer gpa.free(directory);
+            try root.createDirPath(io, directory);
+            const name = try gpa.print("{s}/f{d}.c", .{ directory, i });
+            defer gpa.free(name);
+            try root.writeFile(io, .{ .sub_path = name, .data = "" });
+        }
+        var p = try sweep.Pattern.compile(gpa, "src/**/*.c", .{});
+        defer p.deinit();
+        var best: f64 = std.math.inf(f64);
+        for (0..7) |_| {
+            const t = r.now();
+            var paths = try sweep.expand(gpa, io, root, .{ .pattern = &p }, .{ .files_only = true, .order = .lexical });
+            defer paths.deinit();
+            best = @min(best, nsBetween(t, r.now()));
+            if (paths.items().len != count / 2) return error.MissingPaths;
+        }
+        try r.line("features", "walk 1000 files (half pruned)", "expand", best / 1e6, "ms");
     }
-    var p = try sweep.Pattern.compile(gpa, "src/**/*.c", .{});
-    defer p.deinit();
-    var best: f64 = std.math.inf(f64);
-    for (0..7) |_| {
-        const t = r.now();
-        var paths = try sweep.expand(gpa, io, root, .{ .pattern = &p }, .{ .files_only = true, .order = .lexical });
-        defer paths.deinit();
-        best = @min(best, nsBetween(t, r.now()));
-        if (paths.items().len != count / 2) return error.MissingPaths;
-    }
-    try r.line("features", "walk 1000 files (half pruned)", "expand", best / 1e6, "ms");
+    try std.Io.Dir.cwd().deleteTree(io, root_path);
 }
 
 /// A tree of `width` directories per level, `depth` levels down and `files` a
