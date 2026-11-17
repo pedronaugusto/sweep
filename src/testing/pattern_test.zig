@@ -65,8 +65,9 @@ test "every executor agrees with match" {
     try shake.check(std.testing.allocator, {}, enginesOne, .{ .cases = 3000 });
 }
 
-/// Units a brute-force `leadsTo` tries after the directory.
-const rest_units = [_][]const u8{ "a", "b", "A", "z", "1", ".", "/", "\xc3\xa9", "\xff", ",", "{", "}", "]", "[", "!", "-", "\\", "*", "?", ":" };
+/// Units a brute-force `leadsTo` tries after the directory. `é` is also
+/// tried a byte at a time: read by bytes, a bracket of it matches either.
+const rest_units = [_][]const u8{ "a", "b", "A", "z", "1", ".", "/", "\xc3\xa9", "\xc3", "\xa9", "\xff", ",", "{", "}", "]", "[", "!", "-", "\\", "*", "?", ":" };
 
 /// Pieces whose shortest match is at most one unit, so a rest of three
 /// units reaches every pattern of three pieces.
@@ -127,7 +128,21 @@ fn leadsOne(_: void, c: *shake.Case) anyerror!void {
 }
 
 test "leadsTo equals brute force" {
-    try shake.check(std.testing.allocator, {}, leadsOne, .{ .cases = 150 });
+    try shake.check(std.testing.allocator, {}, leadsOne, .{
+        .cases = 150,
+        .regressions = &.{"0:0:0:0:0:0:0:0:0:3:6:16:7"},
+    });
+}
+
+test "read by bytes, a bracket of a multibyte character leads to a name of one of its bytes" {
+    const options: sweep.Options = .{ .syntax = .{ .unit = .byte, .brackets = .strict } };
+    try std.testing.expect(try sweep.match("[\xc3\xa9]", "\xc3", options));
+    try std.testing.expect(try sweep.match("[\xc3\xa9]", "\xa9", options));
+    try std.testing.expect(!try sweep.match("[\xc3\xa9]", "\xc3\xa9", options));
+    var p = (try compiled("[\xc3\xa9]", options)) orelse return error.TestUnexpectedResult;
+    defer p.deinit();
+    try std.testing.expect(p.leadsTo(""));
+    try std.testing.expect(try bruteLeads("[\xc3\xa9]", "", options));
 }
 
 test "leadsTo reaches a match that needs a unit before a hidden dot" {
