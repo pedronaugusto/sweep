@@ -8,6 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking
 
+- `Composed.init` (`glob.Composed.init`) takes the text alone: the parser's escape flag, which a caller had to pass as `false`, stays the parser's. `Composed` is its own type (`normal.Composed`, over the parser's `normal.Iterator`), with `init`, `next` and `at` as before and the iterator's working state no longer in its fields: `Composed.raw`, `Composed.ordered`, `Composed.starter` and `Composed.last_class` (`glob.Composed.raw`, `glob.Composed.ordered`, `glob.Composed.starter`, `glob.Composed.last_class`) are gone, and a `glob.Composed` literal no longer requires `raw` (it requires `inner`; `Composed.init` builds one).
 - `walk.Matcher` has a third case, `everything`, a walk that only an ignore stack narrows: a switch over a matcher names it.
 - `Walk.open`, `Walk.next`, `Walk.OpenError` and `Walk.NextError` (`walk.Walk.open`, `walk.Walk.next`, `walk.Walk.OpenError`, `walk.Walk.NextError`), and `expand` (`walk.expand`), fail with `ignore.FileError` too, as the entry below says.
 - `Set.Cache.parts` (`glob.Set.Cache.parts`) is a slice of the public `Set.Cache.PartCache`, and `Set.parts` of the public `set.Part`, where both types were private; `normal.Iterator.raw` is of the public `normal.Raw`.

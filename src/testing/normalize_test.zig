@@ -48,8 +48,19 @@ test "NFC parsed syntax and composed wildcard boundaries" {
     try t.expect(!try sweep.match("[é]", "e\u{301}", .{}));
 }
 
+test "Composed reads a text's backslash as a scalar like any other, at its offsets" {
+    // decomposed é composes; each backslash is the text's own, never an escape.
+    var it: sweep.Composed = .init("a\\e\u{301}\\\\");
+    const want = [_]struct { u21, usize }{ .{ 'a', 1 }, .{ '\\', 2 }, .{ 0xe9, 5 }, .{ '\\', 6 }, .{ '\\', 7 } };
+    for (want) |w| {
+        try t.expectEqual(@as(?u21, w[0]), it.next());
+        try t.expectEqual(w[1], it.at);
+    }
+    try t.expectEqual(@as(?u21, null), it.next());
+}
+
 fn codes(bytes: []const u8, out: []u21) []u21 {
-    var it: normal.Iterator = .init(bytes, false);
+    var it: sweep.Composed = .init(bytes);
     var n: usize = 0;
     while (it.next()) |cp| {
         out[n] = cp;

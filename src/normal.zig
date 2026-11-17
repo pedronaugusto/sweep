@@ -109,6 +109,23 @@ pub const Ordered = struct {
         return null;
     }
 };
+/// A text's composed scalars, a backslash one like any other: the public `sweep.Composed`.
+/// `at` is the byte offset after the last scalar `next` returned.
+pub const Composed = struct {
+    inner: Iterator,
+    at: usize = 0,
+
+    pub fn init(text: []const u8) Composed {
+        return .{ .inner = .init(text, false) };
+    }
+
+    pub fn next(c: *Composed) ?u21 {
+        const cp = c.inner.next();
+        c.at = c.inner.at;
+        return cp;
+    }
+};
+
 /// Yields composed scalars and retains original byte offsets. A reordered
 /// segment shares its original end offset; offsets never cut a composition.
 pub const Iterator = struct {
@@ -117,6 +134,7 @@ pub const Iterator = struct {
     ordered: ?Ordered = null,
     starter: ?u21 = null,
     last_class: u8 = 0,
+    /// `escaped` is the parser's: a backslash quotes the byte after it, as the pattern's syntax says.
     pub fn init(bytes: []const u8, escaped: bool) Iterator {
         return .{ .raw = .{ .bytes = bytes, .escaped = escaped } };
     }

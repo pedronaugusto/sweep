@@ -44,9 +44,9 @@ pub const escape = helpers.escape;
 /// Errors from `escape`.
 pub const EscapeError = helpers.EscapeError;
 
-/// Allocation-free NFC scalar iterator. `at` retains original byte boundaries;
-/// invalid UTF-8 bytes use codes above Unicode scalars and remain distinct.
-pub const Composed = @import("normal.zig").Iterator;
+/// Allocation-free NFC scalar iterator over a text (`Composed.init(text)`). `at` retains
+/// original byte boundaries; invalid UTF-8 bytes use codes above Unicode scalars and remain distinct.
+pub const Composed = @import("normal.zig").Composed;
 
 /// Unicode 18 default simple case folding of one scalar.
 /// This is the same mapping used by `Case.unicode`: no normalization,
