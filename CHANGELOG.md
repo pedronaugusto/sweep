@@ -25,7 +25,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `match` decides a path alone, and `matchPath` decides it with its parents, an excluded parent deciding. Both return `Match` with the deciding `Origin` (source, line, text, negated), check-ignore -v's line.
   - Files are read through aegis with a stated limit (`Options.max_file`, git's 100 MiB). An in-tree file is opened without following a link, so a link is refused by the open itself.
   - `Options.unreadable = .skip` is git's warn-and-go-on. Each file skipped is listed in `Stack.skipped` with its reason (`FileTooLarge`, `LinkRefused`, or the error).
-  - `ignore.Checker` asks one path at a time outside a walk. It reads each directory's files the first time a path below it is asked about, and nothing inside an excluded directory.
+  - `ignore.Checker` asks one path at a time outside a walk. It reads each directory's files the first time a path below it is asked about, and nothing inside an excluded directory. `Checker.toStack` hands the stack back with every level read, for a caller that lent its own.
 - `Walk.Options.ignore`: a walk reads each directory's ignore files through the handle it holds, pushes them as it enters and pops them as it leaves, and neither returns nor enters an excluded entry. `Matcher.everything` walks every path the stack lets through.
 
 ### Changed

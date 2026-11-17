@@ -432,6 +432,17 @@ pub const Checker = struct {
         c.* = undefined;
     }
 
+    /// The stack, with every level read so far, handed back to its caller:
+    /// the checker is finished, and needs no `deinit`.
+    pub fn toStack(c: *Checker) Stack {
+        var keys = c.read.keyIterator();
+        while (keys.next()) |key| c.stack.gpa.free(key.*);
+        c.read.deinit(c.stack.gpa);
+        const stack = c.stack;
+        c.* = undefined;
+        return stack;
+    }
+
     /// Whether `path` is excluded, its parents considered
     /// (`Stack.matchPath`). `path` is `/`-separated and relative to `root`.
     pub fn match(c: *Checker, io: Io, path: []const u8, kind: Kind) FileError!Match {

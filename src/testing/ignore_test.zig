@@ -402,6 +402,25 @@ test "a checker reads each directory's files once, and again after one failed" {
     try std.testing.expect((try c.match(io, "c/x.log", .file)).excluded);
 }
 
+test "a checker hands its stack back with every level it read, the caller's first" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try write(io, tmp.dir, "a/.gitignore", "!keep.log\n");
+    var stack: ignore.Stack = .init(gpa, .{});
+    try stack.addText("*.log\n", .{ .group = .file, .source = "info/exclude" });
+    var c: ignore.Checker = .init(stack, tmp.dir);
+    try std.testing.expect(!(try c.match(io, "a/keep.log", .file)).excluded);
+    // The checker is done: its stack is the caller's again, nothing left behind.
+    var back = c.toStack();
+    defer back.deinit();
+    try std.testing.expectEqual(2, back.levels.items.len);
+    const m = back.matchPath("a/keep.log", .file);
+    try std.testing.expect(!m.excluded);
+    try std.testing.expectEqualStrings("a/.gitignore", m.by.?.source);
+    try std.testing.expect(back.matchPath("a/x.log", .file).excluded);
+}
+
 const shake = @import("shakedown");
 const gen = @import("gen.zig");
 const dowild = @import("dowild.zig");
