@@ -31,7 +31,7 @@ level by [ci/layers.zig](../ci/layers.zig), not by module boundaries.
 
 | Layer | Files and responsibility |
 |---|---|
-| Units and syntax | `syntax.zig` owns dialects, options and diagnostics; `unit.zig` decodes bytes/scalars and distinguishes malformed bytes; `unicode.zig` and generated `fold.zig` own simple case folding; generated `composition.zig` owns canonical decomposition, combining classes and composition pairs. |
+| Units and syntax | `syntax.zig` owns dialects, options and diagnostics; `unit.zig` decodes bytes/scalars and distinguishes malformed bytes; `unicode.zig` owns simple case folding over xenoglyph's table. |
 | Normalization | `normal.zig` owns allocation-free canonical composition and original byte boundaries. |
 | Classes | `class.zig` owns bracket membership and folded ranges. |
 | Automaton | `program.zig` owns Thompson instructions, construction scratch, contexts and the shared subject reader. |
@@ -152,11 +152,14 @@ keeping construction independent of the size of the numeric interval.
 
 ## Unicode composition and case ownership
 
-sweep owns Unicode 18.0.0 data for both canonical composition and default simple
-case folding. `tools/normalize.zig` generates committed `composition.zig` from
-canonical Unicode records and full composition exclusions; `tools/casefold.zig`
-generates committed C/S folding mappings in `fold.zig`. Consumers run neither
-generator and fetch no Unicode runtime dependency. `Composed` exposes the same
+The Unicode 18.0.0 data for canonical composition and default simple case
+folding is xenoglyph's, the family's one owner of Unicode data: combining
+classes, canonical decompositions and primary composites (`xenoglyph.normalize`),
+and the C/S folding with each scalar's orbit (`xenoglyph.case`). sweep keeps what
+a glob needs of its own: composition that keeps original byte offsets and
+malformed bytes, and bracket ranges closed under folding orbit by orbit
+(`nextFolding`). The UCD's `NormalizationTest.txt` and `CaseFolding.txt` remain
+sweep's tests of both. `Composed` exposes the same
 composition iterator; `foldCase` exposes the same single-scalar mapping as
 `Case.unicode`. Simple folding implies UTF-8 units, without expanding characters
 or applying Turkic/locale mappings. Folding alone does not normalize.

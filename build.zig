@@ -7,6 +7,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const module = b.addModule("sweep", .{ .root_source_file = b.path("src/sweep.zig"), .target = target, .optimize = optimize });
     module.addImport("aegis", b.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis"));
+    module.addImport("xenoglyph", b.dependency("xenoglyph", .{ .target = target, .optimize = optimize }).module("xenoglyph"));
     b.installArtifact(b.addLibrary(.{ .name = "sweep", .root_module = module }));
 }
 
@@ -21,6 +22,7 @@ pub fn dev(b: *std.Build, tools: type) void {
     const module = package.module("sweep");
     const library = package.artifact("sweep");
     const aegis_dependency = p.dependency("aegis", .{ .target = target, .optimize = optimize });
+    const xenoglyph_dependency = p.dependency("xenoglyph", .{ .target = target, .optimize = optimize });
     const filters = if (test_filter) |filter| &.{filter} else &.{};
     const tests = b.addTest(.{
         .name = "sweep-tests",
@@ -29,7 +31,10 @@ pub fn dev(b: *std.Build, tools: type) void {
             .root_source_file = p.path("src/tests.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{.{ .name = "aegis", .module = aegis_dependency.module("aegis") }},
+            .imports = &.{
+                .{ .name = "aegis", .module = aegis_dependency.module("aegis") },
+                .{ .name = "xenoglyph", .module = xenoglyph_dependency.module("xenoglyph") },
+            },
         }),
     });
     const check = b.step("check", "Compile the tests, library, example and benchmarks without running them");
@@ -92,7 +97,7 @@ pub fn dev(b: *std.Build, tools: type) void {
     });
     // A project that depends on sweep by path, with no packages to
     // fetch: the build a consumer gets.
-    tools.preflight.addConsumerCheck(b, p, .{ .package = "sweep", .program = p.path("ci/consumer.zig"), .packages = &.{aegis_dependency}, .modules = &.{"sweep"} });
+    tools.preflight.addConsumerCheck(b, p, .{ .package = "sweep", .program = p.path("ci/consumer.zig"), .packages = &.{ aegis_dependency, xenoglyph_dependency }, .modules = &.{"sweep"} });
 }
 
 /// sweep again, in the mode a benchmark builds in: an imported module keeps
@@ -106,5 +111,9 @@ fn benchImports(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.l
 fn sweepModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) *std.Build.Module {
     const p = b.dependency("sweep", .{ .target = target, .optimize = optimize }).builder;
     const aegis = p.dependency("aegis", .{ .target = target, .optimize = optimize }).module("aegis");
-    return b.createModule(.{ .root_source_file = p.path("src/sweep.zig"), .target = target, .optimize = optimize, .imports = &.{.{ .name = "aegis", .module = aegis }} });
+    const xenoglyph = p.dependency("xenoglyph", .{ .target = target, .optimize = optimize }).module("xenoglyph");
+    return b.createModule(.{ .root_source_file = p.path("src/sweep.zig"), .target = target, .optimize = optimize, .imports = &.{
+        .{ .name = "aegis", .module = aegis },
+        .{ .name = "xenoglyph", .module = xenoglyph },
+    } });
 }

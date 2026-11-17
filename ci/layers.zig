@@ -3,8 +3,6 @@ const gantry = @import("gantry");
 
 pub const layers: []const gantry.rules.Layer = &.{
     .{ .name = "units and syntax", .patterns = &.{
-        "src/fold.zig",
-        "src/composition.zig",
         "src/unicode.zig",
         "src/unit.zig",
         "src/syntax.zig",
@@ -61,6 +59,7 @@ const package_references = [_]gantry.rules.ReferenceRule{
         .except_targets = &.{
             "std",
             "aegis",
+            "xenoglyph",
             "shakedown",
             // The target, for a test that says what a platform does not do.
             "builtin",
@@ -73,7 +72,6 @@ pub const references: []const gantry.rules.ReferenceRule = &package_references;
 pub const owned: []const gantry.rules.TokenRule = &(durability ++ no_async);
 
 pub const required = [_][]const u8{
-    "src/fold.zig",
     "src/unicode.zig",
     "src/capture.zig",
     "src/walk.zig",

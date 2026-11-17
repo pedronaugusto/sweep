@@ -203,8 +203,7 @@ and `[A]` match nothing while `[A-Z]` matches `q`.
 literals and bracket ranges compare by one canonical scalar. It implies UTF-8
 units. Folding alone does not normalize, expand `ß` to `ss`, or apply Turkic
 mappings.
-Invalid UTF-8 bytes remain distinct. The committed table is generated with
-`zig run tools/casefold.zig > src/fold.zig`; consumers build no generator.
+Invalid UTF-8 bytes remain distinct. The Unicode data is xenoglyph's.
 
 `Options.normalization = .nfc` composes pattern literals and names after parsing
 syntax. `[é]` matches composed or decomposed é, never plain e; `?` consumes one

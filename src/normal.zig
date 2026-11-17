@@ -1,33 +1,24 @@
 //! NFC over valid scalars; malformed bytes are distinct barriers. No heap,
 //! recursion, stream-safe truncation or limit on a combining sequence.
-//! Ordering uses at most 255 stable passes over each segment, O(n).
+//! Ordering uses at most 255 stable passes over each segment, O(n). The
+//! Unicode data (combining classes, canonical decompositions and primary
+//! composites) is xenoglyph's; the iteration, which keeps original byte
+//! offsets and malformed bytes, is sweep's.
 const std = @import("std");
-const data = @import("composition.zig");
+const aegis = @import("aegis");
+const xenoglyph = @import("xenoglyph");
 const unit = @import("unit.zig");
 
+/// Canonical_Combining_Class; a malformed byte's code is a starter.
 pub fn combining(code: u21) u8 {
     if (code < 0x300) return 0;
-    var lo: usize = 0;
-    var hi = data.marks.len;
-    while (lo < hi) {
-        const mid = lo + (hi - lo) / 2;
-        const m = data.marks[mid];
-        if (m.code < code) lo = mid + 1 else if (m.code > code) hi = mid else return m.class;
-    }
-    return 0;
+    return xenoglyph.normalize.combiningClass(code);
 }
+/// The primary composite of `a` and `b`, if there is one.
 pub fn compose(a: u21, b: u21) ?u21 {
     if (a < 0x80 and b < 0x300) return null;
-    if (a >= 0x1100 and a < 0x1113 and b >= 0x1161 and b < 0x1176) return 0xac00 + (a - 0x1100) * 588 + (b - 0x1161) * 28;
-    if (a >= 0xac00 and a < 0xd7a4 and (a - 0xac00) % 28 == 0 and b > 0x11a7 and b < 0x11c3) return a + b - 0x11a7;
-    var lo: usize = 0;
-    var hi = data.pairs.len;
-    while (lo < hi) {
-        const mid = lo + (hi - lo) / 2;
-        const p = data.pairs[mid];
-        if (p.first < a or (p.first == a and p.second < b)) lo = mid + 1 else if (p.first > a or (p.first == a and p.second > b)) hi = mid else return p.result;
-    }
-    return null;
+    if (a >= unit.ill_formed or b >= unit.ill_formed) return null;
+    return xenoglyph.normalize.compose(a, b);
 }
 
 /// The scalars of a text as written, before composition: the type of an
@@ -51,21 +42,13 @@ pub const Raw = struct {
         r.at += u.len;
         r.index = 0;
         r.len = 0;
-        if (u.code >= 0xac00 and u.code < 0xd7a4) {
-            const s = u.code - 0xac00;
-            r.pending = .{ 0x1100 + s / 588, 0x1161 + (s % 588) / 28, 0x11a7 + s % 28, 0 };
-            r.len = if (s % 28 == 0) 2 else 3;
-        } else if (u.code >= 0x80 and u.code < unit.ill_formed) {
-            var lo: usize = 0;
-            var hi = data.decompositions.len;
-            while (lo < hi) {
-                const mid = lo + (hi - lo) / 2;
-                const d = data.decompositions[mid];
-                if (d.code < u.code) lo = mid + 1 else if (d.code > u.code) hi = mid else {
-                    r.pending = d.values;
-                    r.len = d.len;
-                    break;
-                }
+        if (u.code >= 0x80 and u.code < unit.ill_formed) {
+            var buffer: [18]u21 = undefined;
+            const d = xenoglyph.normalize.decompose(u.code, .nfd, &buffer);
+            if (d.len > r.pending.len) aegis.assert.never("a canonical decomposition is at most four scalars");
+            if (d.len > 1 or d[0] != u.code) {
+                @memcpy(r.pending[0..d.len], d);
+                r.len = @intCast(d.len);
             }
         }
         if (r.len == 0) return u.code;

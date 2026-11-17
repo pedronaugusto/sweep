@@ -30,6 +30,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The Unicode data is xenoglyph's: sweep depends on xenoglyph (94cb967, on the same aegis f52eabe), and its own generated NFC and case-folding tables (`src/composition.zig`, `src/fold.zig`) and their generators (`tools/`) are gone. Composition keeps original offsets and malformed bytes as before, and a folded bracket range closes orbit by orbit through `xenoglyph.case.nextFolding`. `foldCase` and `Composed` are unchanged; the UCD's conformance files still test both.
 - On FreeBSD and NetBSD a symbolic link refused by a no-follow open (`Links.refuse`, `follow_symlinks = false`) is `error.LinkRefused` or skipped as on Linux and macOS, where it was `error.Unexpected`: those kernels refuse `O_NOFOLLOW` on a link with EMLINK and EFTYPE, which std does not name, so there the name is looked at, unfollowed, and only a link counts as refused. Development on preflight's ci-standard 158c176.
 - Pins aegis f52eabe, still 0.2.4 (its addition: `id.raws`), the one aegis the family builds on; development on preflight's ci-standard f991816 and shakedown 327bc61. Nothing this package calls changed.
 - Development on preflight's ci-standard 9c18016 and shakedown b99b768. The property that `leadsTo` equals brute force also tries `é`'s two bytes alone: read by bytes, `[é]` is a bracket of either byte and matches a one-byte name, which `leadsTo` saw and the brute force did not try. The fuzzer's case is kept as a regression, with a test of the bracket by itself.

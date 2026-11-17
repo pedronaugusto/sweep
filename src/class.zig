@@ -155,9 +155,17 @@ pub const Filler = struct {
             }
         }
         if (hi >= 256) f.addRange(@max(lo, 256), hi);
-        if (f.case == .unicode) for (unicode.pairs) |pair| {
-            if (pair.from >= lo and pair.from <= hi and (pair.to < lo or pair.to > hi)) f.single(pair.to);
-        };
+        if (f.case == .unicode) {
+            // Each member that folds with another brings its fold in, where
+            // the range does not hold it already.
+            var at = lo;
+            while (unicode.nextFolding(at)) |code| {
+                if (code > hi) break;
+                const to = unicode.fold(code);
+                if (to < lo or to > hi) f.single(to);
+                at = code + 1;
+            }
+        }
     }
 
     /// A `[:name:]` member.
