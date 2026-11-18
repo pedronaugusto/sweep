@@ -22,6 +22,10 @@ and Unicode transforms) and `sweep.walk` (filesystem expansion); the common
 names are also at the root. A program that only matches never compiles the walk.
 See [the design](docs/design.md) for ownership, layers and matching bounds.
 
+The package a project fetches is sweep's build files, its Zig sources and its docs: 144 KB
+compressed, 0.6 MiB unpacked. Its test data (the UCD's NormalizationTest.txt and CaseFolding.txt,
+the pattern corpora) stays in the repository under `testdata/`.
+
 ## Stability
 
 sweep is 0.x and tracks Zig 0.17.x. A breaking change comes only in a minor release
@@ -323,5 +327,5 @@ Unicode folding, captures and a pruned filesystem expansion. Run from `zig-out/b
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE). Unicode data uses the
-[Unicode data license](src/UNICODE-LICENSE.txt).
+MIT. See [LICENSE](LICENSE). The Unicode test data in `testdata/` uses the
+[Unicode data license](testdata/UNICODE-LICENSE.txt).

@@ -82,6 +82,8 @@ pub fn dev(b: *std.Build, tools: type) void {
     // The test doubles are shakedown's.
     const shakedown = b.dependency("shakedown", .{ .target = target, .optimize = optimize });
     tests.root_module.addImport("shakedown", shakedown.module("shakedown"));
+    // The fixtures the tests read, outside src/ and the paths a project fetches.
+    tests.root_module.addImport("testdata", b.createModule(.{ .root_source_file = p.path("testdata/root.zig") }));
     tools.preflight.addCi(b, p, .{
         .tests = test_step,
         .portable_tests = true,

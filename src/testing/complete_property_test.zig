@@ -3,6 +3,7 @@ const sweep = @import("../glob.zig");
 const pattern_mod = @import("../pattern.zig");
 const unicode = @import("../unicode.zig");
 const shake = @import("shakedown");
+const testdata = @import("testdata");
 
 fn engines(gpa: std.mem.Allocator, text: []const u8, subject: []const u8, options: sweep.Options, expected: bool) !void {
     const one = try sweep.match(text, subject, options);
@@ -73,7 +74,7 @@ test "complete regular extglobs agree with short expansion oracle" {
 }
 
 test "complete Unicode table agrees with raw default simple folding records" {
-    var lines = std.mem.splitScalar(u8, @embedFile("CaseFolding.txt"), '\n');
+    var lines = std.mem.splitScalar(u8, testdata.file("CaseFolding.txt"), '\n');
     var count: usize = 0;
     while (lines.next()) |line| {
         if (line.len == 0 or line[0] == '#') continue;
@@ -114,7 +115,7 @@ test "complete capture cache survives all allocation failures and queries alloca
 }
 
 test "complete syntax agrees with independent generated vectors" {
-    var lines = std.mem.splitScalar(u8, @embedFile("syntax.tsv"), '\n');
+    var lines = std.mem.splitScalar(u8, testdata.file("syntax.tsv"), '\n');
     while (lines.next()) |line| {
         if (line.len == 0) continue;
         var fields = std.mem.splitScalar(u8, line, '\t');
@@ -128,7 +129,7 @@ test "complete syntax agrees with independent generated vectors" {
 }
 
 test "complete captures agree with independent generated vectors" {
-    var lines = std.mem.splitScalar(u8, @embedFile("captures.tsv"), '\n');
+    var lines = std.mem.splitScalar(u8, testdata.file("captures.tsv"), '\n');
     while (lines.next()) |line| {
         if (line.len == 0) continue;
         var fields = std.mem.splitScalar(u8, line, '\t');

@@ -61,6 +61,8 @@ const package_references = [_]gantry.rules.ReferenceRule{
             "aegis",
             "xenoglyph",
             "shakedown",
+            // The development build's test data (testdata/root.zig).
+            "testdata",
             // The target, for a test that says what a platform does not do.
             "builtin",
         },

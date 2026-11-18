@@ -1,5 +1,6 @@
 const std = @import("std");
 const shakedown = @import("shakedown");
+const testdata = @import("testdata");
 const sweep = @import("../glob.zig");
 const normal = @import("../normal.zig");
 const t = std.testing;
@@ -81,7 +82,7 @@ fn encode(text: []const u8, out: []u8) ![]u8 {
     return out[0..n];
 }
 test "NFC Unicode 18 complete normalization conformance corpus" {
-    var lines = std.mem.splitScalar(u8, @embedFile("NormalizationTest.txt"), '\n');
+    var lines = std.mem.splitScalar(u8, testdata.file("NormalizationTest.txt"), '\n');
     var rows: usize = 0;
     while (lines.next()) |line| {
         if (line.len == 0 or line[0] == '#' or line[0] == '@') continue;
