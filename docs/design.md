@@ -1,6 +1,8 @@
 # Architecture
 
-sweep owns glob syntax and matching. Its runtime closure is sweep → aegis → std.
+sweep owns glob syntax and matching. Its runtime closure is sweep → aegis and
+xenoglyph (Unicode data, the family's one owner of it) → std: foundational
+leaves only, so a tool may build on sweep.
 Matching,
 captures and Unicode transforms are pure computation; filesystem expansion is
 an optional layer above them that accepts the caller's `std.Io` per call.
@@ -21,7 +23,7 @@ below are ordered from lowest to highest; imports stay within a layer or go
 downward. Paths are under `src/`. Tests have their own dependency graph;
 shakedown and preflight are lazy test/build dependencies, outside a consumer's
 runtime closure. The package is one build module, `sweep`, with the namespaces
-`sweep.glob` and `sweep.walk`. A second module would buy something only if a part
+`sweep.glob`, `sweep.walk` and `sweep.ignore`. A second module would buy something only if a part
 had dependencies other users should not fetch or must not link something, and
 neither part does: aegis is the package's, and the walk adds only `std.Io`, which
 Zig analyses where a program names it. A program that only matches therefore
@@ -67,6 +69,49 @@ ignore files through the handle it holds, pushes them as it enters and pops them
 as it leaves, and neither returns nor enters an excluded entry; a pattern's
 invariant base still has its ancestors' files read, and an excluded base yields
 nothing.
+
+## Ignore stacks
+
+`sweep.ignore` is git 2.56.0's `dir.c` precedence, one engine for relic,
+lookout, hold and any walker. A `Stack` holds levels in the order added, one
+per file or pattern list, each a compiled `Set` with its own cache. A level
+belongs to a `Group`: `file` (`core.excludesFile`, then `info/exclude`),
+`directory` or `command_line`. A higher group wins whatever the order added;
+within a group the later level wins, so a deeper directory overrides a
+shallower one; within a level the last matching line wins.
+
+`match(path, kind)` decides a path alone, its parents left to a walk.
+`matchPath` advances each level once over the path (`Set.ancestors`): an
+excluded parent decides, and a `dir/*` parent is not excluded. Both return a
+`Match` whose `Origin` (source, one-based line, the line as `check-ignore -v`
+prints it, `negated`) names the line that decided. `mark` and `popTo` drop a
+directory's levels as a walk leaves it. `Checker` answers one path at a time
+outside a walk (a watcher, a checkout): it reads each directory's files the
+first time a path below it is asked about, shallowest first, never inside an
+excluded directory, and counts a directory read only once its files were read
+or found absent, so a failed question asks again.
+
+- One `Set` per level, not one for the stack: a walk pushes and pops levels,
+  and a single set would be rebuilt at every directory.
+- Each level owns its cache, and one thread asks a stack at a time; another
+  thread builds its own. A shared, locked stack would serialize every question.
+- Paths are `/`-separated and relative to the stack's root; a level's patterns
+  are relative to its `base`. Nothing resolves `..`.
+- The stack reads its files through the caller's `Io`, at most
+  `Options.max_file` (git's 100 MiB). A directory's files are opened without
+  following a link (`Links.refuse`), as git refuses an in-tree link; the global
+  files follow theirs. A file that cannot be read fails, or under
+  `Unreadable.skip` counts as absent and is listed in `Stack.skipped` with its
+  reason, as git warns and goes on. Nothing is dropped silently.
+- A line sweep refuses as `InvalidPattern` is left out of its level: git's
+  wildmatch aborts on it, so it never matches there either.
+- No repository discovery and no directories above the root: a caller that
+  wants them adds their files first, as levels.
+
+Tests transcribe git 2.56.0's t0008 and t3001 matching cases, `check-ignore -v`
+origins included; a fuzz target holds a stack to git's walk over its lists and
+any bytes to a decision or a named refusal; every allocation is failed once.
+`bench/` walks a generated tree with an ignore file in every directory.
 
 ## Matching and bounds
 
