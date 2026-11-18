@@ -60,8 +60,22 @@ fn probe(p: *sweep.Pattern, lo: u21, hi: u21, x: u21) !void {
 }
 
 test "a folded bracket range matches what folds as a member does, and nothing else" {
-    try shake.check(std.testing.allocator, {}, closedRange, .{ .cases = 400 });
+    try shake.check(std.testing.allocator, {}, closedRange, .{
+        .cases = 400,
+        .regressions = &.{ "177:0:0:5c", "109:0:0:ca", "113:1:0:113" },
+    });
     const o: sweep.Options = .{ .syntax = .glob, .case = .unicode };
+    // Ƀ (U+0243) brings ƀ (U+0180) in, so a compiled pattern's unit class
+    // starts at U+0181, which folds to ɓ (U+0253) in the range: ƈ (U+0188),
+    // folding with nothing in the range, stays out all the same.
+    var p: sweep.Pattern = try .compile(std.testing.allocator, "[\u{189}-\u{253}]", o);
+    defer p.deinit();
+    try std.testing.expect(!p.matches("\u{188}"));
+    try std.testing.expect(p.matches("\u{180}"));
+    try std.testing.expect(p.matches("\u{181}"));
+    var q: sweep.Pattern = try .compile(std.testing.allocator, "[\u{1f7}-\u{253}]", o);
+    defer q.deinit();
+    try std.testing.expect(!q.matches("\u{1f6}"));
     // KELVIN SIGN alone brings k in; a range of Greek capitals brings their small letters and final sigma.
     try std.testing.expect(try sweep.match("[\u{212a}-\u{212a}]", "k", o));
     try std.testing.expect(try sweep.match("[Α-Ω]", "ς", o));

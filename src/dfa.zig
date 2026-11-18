@@ -78,6 +78,24 @@ pub const Classes = struct {
             runs += 1;
         }
         bounds.items.len = if (p.reading.utf8) runs else 0;
+        // Under Unicode folding a code is looked up by its fold (`of`), so
+        // only a code that folds to itself ever enters a run: the run starts
+        // at its first such code, which is also the code it is judged and
+        // stepped by. A run start that folds elsewhere would judge its run
+        // by another run's code. A run with no such code is never entered,
+        // and goes.
+        if (p.reading.unicode) {
+            var kept: usize = 0;
+            for (bounds.items, 0..) |b, i| {
+                const end = if (i + 1 < bounds.items.len) bounds.items[i + 1] else class_max + 1;
+                var c = b;
+                while (c < end and unicode.fold(@intCast(c)) != c) c += 1;
+                if (c == end) continue;
+                bounds.items[kept] = c;
+                kept += 1;
+            }
+            bounds.items.len = kept;
+        }
         // Elements: the 256 low codes, then one per run.
         const elements = 256 + bounds.items.len;
         const reps = try gpa.alloc(Code, elements);
