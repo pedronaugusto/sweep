@@ -1,17 +1,17 @@
 .{
     .name = .sweep,
-    .version = "0.4.0",
+    .version = "0.4.1",
     .minimum_zig_version = "0.17.0",
     .fingerprint = 0x882b123269f04ae8,
     .paths = .{ "build.zig", "build.zig.zon", "src", "docs/design.md", "README.md", "CHANGELOG.md", "LICENSE" },
     .dependencies = .{
         .aegis = .{
-            .url = "git+https://github.com/pedronaugusto/aegis?ref=v0.3.0#ad1a06a84ee21cb1e388bf35b8decd17171d6b75",
-            .hash = "aegis-0.3.0-rsxoukJHDgCbAKMxxAp8WSBtP8AvUJtARcYZy_DNJ3GE",
+            .url = "git+https://github.com/pedronaugusto/aegis?ref=v0.4.0#4739dccd71cfc16b0c15bc27e2d7dca76de9bc21",
+            .hash = "aegis-0.4.0-rsxouv1KDgCdGc-mhY-qBfyE70ar4OQiGGKHKndirWnQ",
         },
         .xenoglyph = .{
-            .url = "git+https://github.com/pedronaugusto/xenoglyph?ref=v0.6.0#23b209c83ac650647e08f01eaee4b7e2df73b580",
-            .hash = "xenoglyph-0.6.0-YKXZleQFVADIipb4HZ4wcdH6jbZW_qk8ms1O7NSHAMpQ",
+            .url = "git+https://github.com/pedronaugusto/xenoglyph?ref=v0.6.1#f27799d23ad99c2ae2a23a5fab401c0e9efebc9e",
+            .hash = "xenoglyph-0.6.1-YKXZlR8GVADYSXwNQ3Wdc0cikk1d7nzHrYwfrCLIw_L-",
         },
     },
     .dev_dependencies = .{
@@ -21,8 +21,8 @@
         },
 
         .shakedown = .{
-            .url = "git+https://github.com/pedronaugusto/shakedown#b99b768bd4e509b79d47f436772f822e8a74d5f9",
-            .hash = "shakedown-0.6.0-BR8U4yfuGwDC_l4tgOTpiOpHMqt2muRn6MpO85BLauE-",
+            .url = "git+https://github.com/pedronaugusto/shakedown#53158a416bba0a1695c0de31d65a85946962c29b",
+            .hash = "shakedown-0.6.0-BR8U49mXHAD7-q4s0XKAGKwT-KjJJkE6Y4ymM5qbXCaw",
         },
     },
 }

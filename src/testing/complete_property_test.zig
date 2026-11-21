@@ -114,18 +114,19 @@ test "complete capture cache survives all allocation failures and queries alloca
     try std.testing.expectEqual(before, failing.allocations);
 }
 
+/// One row of syntax.tsv: mode, pattern, subject, and 1 where it matches.
+fn syntaxRow(_: void, gpa: std.mem.Allocator, line: []const u8) anyerror!void {
+    var fields = std.mem.splitScalar(u8, line, '\t');
+    const mode = fields.next().?;
+    const text = fields.next().?;
+    const subject = fields.next().?;
+    const want = std.mem.eql(u8, fields.next().?, "1");
+    const options: sweep.Options = if (std.mem.eql(u8, mode, "ec")) .{ .syntax = .editorconfig } else .{ .syntax = .{ .extglob = true } };
+    try engines(gpa, text, subject, options, want);
+}
+
 test "complete syntax agrees with independent generated vectors" {
-    var lines = std.mem.splitScalar(u8, testdata.file("syntax.tsv"), '\n');
-    while (lines.next()) |line| {
-        if (line.len == 0) continue;
-        var fields = std.mem.splitScalar(u8, line, '\t');
-        const mode = fields.next().?;
-        const text = fields.next().?;
-        const subject = fields.next().?;
-        const want = std.mem.eql(u8, fields.next().?, "1");
-        const options: sweep.Options = if (std.mem.eql(u8, mode, "ec")) .{ .syntax = .editorconfig } else .{ .syntax = .{ .extglob = true } };
-        try engines(std.testing.allocator, text, subject, options, want);
-    }
+    try shake.corpus.rows(std.testing.allocator, testdata.file("syntax.tsv"), {}, syntaxRow);
 }
 
 test "complete captures agree with independent generated vectors" {
