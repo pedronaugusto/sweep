@@ -249,12 +249,8 @@ pub const Walk = struct {
     }
 };
 
-/// A directory handle with one owner, closed once.
-const OwnedDir = aegis.own.OwnedIo(Io.Dir, closeDir);
-
-fn closeDir(handle: *Io.Dir, io: Io) void {
-    handle.close(io);
-}
+/// A directory handle with one owner, closed once: aegis's `own.Dir`.
+const OwnedDir = aegis.own.Dir;
 
 /// Owned expansion results. Paths stay valid until deinit.
 pub const Paths = struct {
