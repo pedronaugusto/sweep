@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-21
+
 ### Breaking
 
 - `Composed.init` (`glob.Composed.init`) takes the text alone: the parser's escape flag, which a caller had to pass as `false`, stays the parser's. `Composed` is its own type (`normal.Composed`, over the parser's `normal.Iterator`), with `init`, `next` and `at` as before and the iterator's working state no longer in its fields: `Composed.raw`, `Composed.ordered`, `Composed.starter` and `Composed.last_class` (`glob.Composed.raw`, `glob.Composed.ordered`, `glob.Composed.starter`, `glob.Composed.last_class`) are gone, and a `glob.Composed` literal no longer requires `raw` (it requires `inner`; `Composed.init` builds one).
@@ -13,7 +15,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Walk.open`, `Walk.next`, `Walk.OpenError` and `Walk.NextError` (`walk.Walk.open`, `walk.Walk.next`, `walk.Walk.OpenError`, `walk.Walk.NextError`), and `expand` (`walk.expand`), fail with `ignore.FileError` too, as the entry below says.
 - `Set.Cache.parts` (`glob.Set.Cache.parts`) is a slice of the public `Set.Cache.PartCache`, and `Set.parts` of the public `set.Part`, where both types were private; `normal.Iterator.raw` is of the public `normal.Raw`.
 - `ignore.Checker.root` is an `aegis.own.Unowned(std.Io.Dir)`, the caller's directory it never closes; `ignore.Checker.init` still takes the `std.Io.Dir`.
-
 - `Walk.OpenError` (and so `NextError`) holds `ignore.FileError`: a walk with `Options.ignore` reads each directory's ignore files and fails with what reading one did. `Matcher` gains `everything`, so an exhaustive switch over it needs that arm.
 
 ### Added
@@ -30,6 +31,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- sweep's own development holds it to the family's policy: `"policy": "family"` in ci/preflight.json, beside the hardened profile ci/workflow.json already declares; the hardened and hardened-tsan legs pass.
 - The package a project fetches holds no test data: the UCD's NormalizationTest.txt and CaseFolding.txt, the pattern corpora (`syntax.tsv`, `captures.tsv`) and the Unicode licence that covers them move from `src/` to `testdata/`, outside `build.zig.zon`'s paths, and the tests read them through the development build's `testdata` module. A fetch is 144 KB compressed and 0.6 MiB unpacked, where it was 644 KB and 3.5 MiB.
 - The Unicode data is xenoglyph's: sweep depends on xenoglyph (94cb967, on the same aegis f52eabe), and its own generated NFC and case-folding tables (`src/composition.zig`, `src/fold.zig`) and their generators (`tools/`) are gone. Composition keeps original offsets and malformed bytes as before, and a folded bracket range closes orbit by orbit through `xenoglyph.case.nextFolding`. `foldCase` and `Composed` are unchanged; the UCD's conformance files still test both.
 - Under `.case = .unicode` a compiled pattern's bracket no longer matches a code that folds with no member: `[Ɖ-ɓ]` (U+0189–U+0253) matched `ƈ` (U+0188). The automaton's unit classes are looked up by a subject code's fold, but a class starting at a code that folds elsewhere was judged by that fold: here Ƀ brings ƀ (U+0180) in, a class starts at Ɓ (U+0181), which folds to ɓ in the range, and every code up to U+0188 matched with it. A class now starts at, and is judged by, its first code that folds to itself. The bracket-range property found it; its three shrunk cases are kept as regressions.
@@ -39,6 +41,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Pins aegis dc3ed602, still 0.2.4; development on preflight's ci-standard 0990716 and glint 0.8, and shakedown ed5a873. The ignore files are read in one input seam (`src/input.zig`); the lazy automaton's tables are placed in its one allocation by aegis's `parts.Block`, each on a cache line, with no conversion of its own; std's asserts are aegis contracts, kept in every build.
 - Pins aegis c8982a8, still 0.2.4: six additive commits after 3c0b13e (the role declarations a linter reads, `lint_rules`), the aegis the development build's preflight selects. Nothing sweep calls changed.
 - aegis 0.3, which has one way to lend: `ignore.Checker` holds the caller's root as the `std.Io.Dir` itself, lent by value, which it never closes. Pins aegis breaking-0.3 (7bdb587) and shakedown on it.
+- Pins aegis 0.3.0 and xenoglyph 0.6.0.
 
 ## [0.3.0] - 2026-10-27
 
