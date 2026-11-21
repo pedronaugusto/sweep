@@ -10,6 +10,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Development on shakedown 53158a4. The syntax corpus test runs through `shakedown.corpus.rows`, each row with a leak-counting allocator that takes no stack trace per allocation: in Debug the testing allocator's trace per allocation made the test take 22.7 s, close enough to the test runner's 120 s bound that a loaded machine ran it out, and it now takes 2.6 s.
 
+## [0.4.1] - 2026-11-21
+
+### Changed
+
+- Pins aegis 0.4.0 and xenoglyph 0.6.1.
+
 ## [0.4.0] - 2026-11-21
 
 ### Breaking
