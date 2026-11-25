@@ -586,3 +586,21 @@ test "an origin's text is the line as git check-ignore -v names it: no CR, no tr
         try std.testing.expectEqualStrings(case[1], m.by.?.text);
     }
 }
+
+test "a file whose level runs out of memory is freed once, whichever allocation fails" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try write(io, tmp.dir, ".gitignore", "*.log\nbuild/\n!keep.log\n");
+    var fail_index: usize = 0;
+    while (true) : (fail_index += 1) {
+        var failing: std.testing.FailingAllocator = .init(gpa, .{ .fail_index = fail_index });
+        var stack: ignore.Stack = .init(failing.allocator(), .{});
+        defer stack.deinit();
+        stack.addDirectory(io, tmp.dir, "") catch |err| {
+            try std.testing.expectEqual(error.OutOfMemory, err);
+            continue;
+        };
+        if (!failing.has_induced_failure) break;
+    }
+}

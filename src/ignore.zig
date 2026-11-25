@@ -211,7 +211,7 @@ pub const Stack = struct {
     pub fn addFile(s: *Stack, io: Io, dir: Io.Dir, path: []const u8, place: Place, links: Links) FileError!void {
         const text = s.read(io, dir, path, links) catch |err| return s.unreadable(place.source, err);
         const owned = text orelse return;
-        errdefer s.gpa.free(owned);
+        // `addLevel` takes the text whatever it returns, a failure included.
         s.addLevel(owned, .lines, place) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.PatternTooLong => return s.unreadable(place.source, error.PatternTooLong),

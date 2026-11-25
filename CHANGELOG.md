@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `ignore.Stack.addFile`, and so `addDirectory` and a `Checker`'s reads, frees an ignore file's text once when its level runs out of memory, where it freed it a second time after `addLevel` had: an allocation failure while a file's lines compiled was a double free.
+
 ### Changed
 
 - Development on shakedown 53158a4. The syntax corpus test runs through `shakedown.corpus.rows`, each row with a leak-counting allocator that takes no stack trace per allocation: in Debug the testing allocator's trace per allocation made the test take 22.7 s, close enough to the test runner's 120 s bound that a loaded machine ran it out, and it now takes 2.6 s.
